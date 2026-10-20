@@ -2,7 +2,11 @@
 // fetched into a short "building story" or an answer to one question, via Gemini.
 // Holds the Gemini key (env.GEMINI_API_KEY secret). Never calls NYC APIs, never logs payloads.
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+// Tried in order. 404 (model retired for this account), 429 (quota) and 503 (overloaded)
+// fall through to the next model; any other failure is final.
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.8-flash']
+const RETRYABLE_STATUS = new Set([404, 429, 503])
+const geminiUrl = (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
 const ALLOWED_ORIGINS = new Set(['https://rahul-05.github.io', 'http://localhost:5173'])
 
@@ -55,21 +59,30 @@ function promptFor(route, { address, summary, question }) {
 }
 
 async function generate(env, systemText, userText, maxOutputTokens) {
-  const res = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemText }] },
-      contents: [{ role: 'user', parts: [{ text: userText }] }],
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens,
-        // Short grounded rewrites don't need thinking; this keeps latency and quota low.
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    }),
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: systemText }] },
+    contents: [{ role: 'user', parts: [{ text: userText }] }],
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens,
+      // Short grounded rewrites don't need thinking; this keeps latency and quota low.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   })
-  if (!res.ok) throw new Error(`Gemini returned ${res.status}`)
+
+  let res
+  const failures = []
+  for (const model of GEMINI_MODELS) {
+    res = await fetch(geminiUrl(model), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+      body,
+    })
+    if (res.ok) break
+    failures.push(`${model} ${res.status}`)
+    if (!RETRYABLE_STATUS.has(res.status)) break
+  }
+  if (!res.ok) throw new Error(`Gemini returned ${failures.join(', ')}`)
 
   const data = await res.json()
   const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim()

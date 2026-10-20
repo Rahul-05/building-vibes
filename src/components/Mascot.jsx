@@ -2,110 +2,79 @@ import { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { prefersReducedMotion } from '../lib/motion.js'
 
-// "Vibe" — a squishy building blob. All mood-dependent shapes share the same SVG
-// command structure (M x y Q cx cy x y), so GSAP can tween `d` between moods without plugins.
+// "Vibe" — a calm line-art building. The face is strokes only (no filled eyes); every
+// mood-dependent path shares the same command structure (M x y Q cx cy x y), so GSAP can
+// tween `d` between moods without plugins.
+const INK = '#1d1a3a'
+const STROKE = 3.5
+
 const MOODS = {
   happy: {
-    body: '#ff5ca8', shade: '#e8448f', cheek: '#ffc2dc', window: '#ffe68a',
-    mouth: 'M78 132 Q100 160 122 132',
-    browL: 'M64 72 Q78 64 92 72', browR: 'M108 72 Q122 64 136 72',
-    pupil: { x: 0, y: 1 }, lid: 0, sweat: 0, sparkle: 1,
+    body: '#f6bfcf', door: '#e79bb2',
+    eyeL: 'M73 103 Q80 95 87 103', eyeR: 'M113 103 Q120 95 127 103',
+    browL: 'M73 87 Q80 85 87 87', browR: 'M113 87 Q120 85 127 87', brow: 0,
+    mouth: 'M90 124 Q100 132 110 124',
   },
   mixed: {
-    body: '#ffc93c', shade: '#f0b31f', cheek: '#ffe9a8', window: '#fff6d6',
-    mouth: 'M84 140 Q102 140 118 133',
-    browL: 'M64 76 Q78 74 92 76', browR: 'M108 64 Q122 54 136 64',
-    pupil: { x: 4, y: -4 }, lid: 0, sweat: 0, sparkle: 0,
+    body: '#f5dc9a', door: '#e3c172',
+    eyeL: 'M74 101 Q80 104 86 101', eyeR: 'M114 101 Q120 104 126 101',
+    browL: 'M73 87 Q80 85 87 87', browR: 'M113 87 Q120 85 127 87', brow: 0,
+    mouth: 'M92 127 Q100 129 108 127',
   },
   worried: {
-    body: '#8fa8ff', shade: '#6f8cf0', cheek: '#c3d0ff', window: '#dfe6ff',
-    mouth: 'M84 145 Q100 130 116 145',
-    browL: 'M64 79 Q80 75 92 68', browR: 'M108 68 Q120 75 136 79',
-    pupil: { x: 7, y: 3 }, lid: 1, sweat: 1, sparkle: 0,
+    body: '#b9c5ee', door: '#97a6db',
+    eyeL: 'M74 104 Q80 101 86 100', eyeR: 'M114 100 Q120 101 126 104',
+    browL: 'M73 90 Q80 88 86 85', browR: 'M114 85 Q120 88 127 90', brow: 0.65,
+    mouth: 'M92 129 Q100 124 108 129',
   },
   searching: {
-    body: '#6ee7b7', shade: '#43cf98', cheek: '#c4f5df', window: '#eafff5',
-    mouth: 'M90 138 Q100 148 110 138',
-    browL: 'M64 70 Q78 64 92 70', browR: 'M108 70 Q122 64 136 70',
-    pupil: { x: 0, y: 0 }, lid: 0, sweat: 0, sparkle: 0,
+    body: '#b4e3cf', door: '#8fcfb4',
+    eyeL: 'M74 102 Q80 97 86 102', eyeR: 'M114 102 Q120 97 126 102',
+    browL: 'M73 87 Q80 85 87 87', browR: 'M113 87 Q120 85 127 87', brow: 0,
+    mouth: 'M94 126 Q100 129 106 126',
   },
 }
 
-// Position lives on the wrapper so GSAP can own the inner path's scale/rotation.
-function Sparkle({ x, y, s = 1, color = '#ffd23f', visible }) {
-  return (
-    <g transform={`translate(${x} ${y}) scale(${s})`}>
-      <path
-        className="sparkle"
-        d="M0 -10 C2 -2 2 -2 10 0 C2 2 2 2 0 10 C-2 2 -2 2 -10 0 C-2 -2 -2 -2 0 -10 Z"
-        fill={color}
-        stroke="#1d1a3a"
-        strokeWidth="2"
-        opacity={visible}
-      />
-    </g>
-  )
-}
+// Slow float per mood: [amplitude in viewBox units (≤4), seconds per half-cycle].
+const FLOAT = { happy: [4, 4], mixed: [3, 4.6], worried: [2.5, 5], searching: [3.5, 3.6] }
+
+const line = { stroke: INK, strokeWidth: STROKE, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }
 
 export default function Mascot({ mood = 'happy', className = '', title }) {
   const root = useRef(null)
   const initial = useRef(MOODS[mood] || MOODS.happy).current
 
-  // Mood transition: tween every mood-driven attribute to the new state.
+  // Mood transition: soft crossfade of colors and face strokes, plus a gentle 0.98 → 1 settle.
   useLayoutEffect(() => {
     const cfg = MOODS[mood] || MOODS.happy
-    const el = root.current
-    const q = gsap.utils.selector(el)
-    const d = prefersReducedMotion() ? 0 : 0.7
-    const ease = 'back.out(1.6)'
+    const q = gsap.utils.selector(root.current)
+    const reduce = prefersReducedMotion()
+    const d = reduce ? 0 : 0.9
+    const ease = 'sine.inOut'
 
-    gsap.to(q('.body'), { attr: { fill: cfg.body }, duration: d })
-    gsap.to(q('.shade'), { attr: { fill: cfg.shade }, duration: d })
-    gsap.to(q('.lid'), { attr: { fill: cfg.body }, opacity: cfg.lid, duration: d })
-    gsap.to(q('.cheek'), { attr: { fill: cfg.cheek }, duration: d })
-    gsap.to(q('.win'), { attr: { fill: cfg.window }, duration: d })
-    gsap.to(q('.mouth'), { attr: { d: cfg.mouth }, duration: d, ease })
+    gsap.to(q('.body'), { attr: { fill: cfg.body }, duration: d, ease })
+    gsap.to(q('.door'), { attr: { fill: cfg.door }, duration: d, ease })
+    gsap.to(q('.eye-l'), { attr: { d: cfg.eyeL }, duration: d, ease })
+    gsap.to(q('.eye-r'), { attr: { d: cfg.eyeR }, duration: d, ease })
     gsap.to(q('.brow-l'), { attr: { d: cfg.browL }, duration: d, ease })
     gsap.to(q('.brow-r'), { attr: { d: cfg.browR }, duration: d, ease })
-    gsap.to(q('.pupil'), { x: cfg.pupil.x, y: cfg.pupil.y, duration: d, ease })
-    gsap.to(q('.sweat'), { opacity: cfg.sweat, scale: cfg.sweat ? 1 : 0.4, transformOrigin: '50% 0%', duration: d })
-    gsap.to(q('.sparkle'), { opacity: cfg.sparkle, scale: cfg.sparkle, transformOrigin: '50% 50%', duration: d, stagger: 0.08, ease })
-    // A little "boing" so the change itself reads as a moment.
-    if (d) gsap.fromTo(q('.boing'), { scaleX: 1.12, scaleY: 0.88 }, { scaleX: 1, scaleY: 1, duration: 0.9, ease: 'elastic.out(1, 0.4)', transformOrigin: '50% 100%' })
+    gsap.to(q('.brow'), { opacity: cfg.brow, duration: d, ease })
+    gsap.to(q('.mouth'), { attr: { d: cfg.mouth }, duration: d, ease })
+    if (!reduce) {
+      gsap.fromTo(q('.settle'), { scale: 0.98, opacity: 0.85 }, { scale: 1, opacity: 1, duration: 0.9, ease: 'power1.out', transformOrigin: '50% 100%' })
+    }
   }, [mood])
 
-  // Idle loop per mood. Reverted (transforms reset) before the next mood's loop starts.
+  // Idle float per mood. Reverted (transforms reset) before the next mood's loop starts.
   useLayoutEffect(() => {
     if (prefersReducedMotion()) return
+    const [amp, dur] = FLOAT[mood] || FLOAT.happy
     const ctx = gsap.context(() => {
-      const blink = gsap.timeline({ repeat: -1, repeatDelay: 2.8 })
-      blink.to('.eye', { scaleY: 0.1, transformOrigin: '50% 50%', duration: 0.08 }).to('.eye', { scaleY: 1, duration: 0.12 })
-
-      if (mood === 'happy') {
-        gsap.timeline({ repeat: -1 })
-          .to('.figure', { y: -16, scaleY: 1.03, scaleX: 0.98, duration: 0.42, ease: 'power2.out', transformOrigin: '50% 100%' })
-          .to('.figure', { y: 0, scaleY: 1, scaleX: 1, duration: 0.38, ease: 'power2.in' })
-          .to('.figure', { scaleY: 0.93, scaleX: 1.06, duration: 0.1, yoyo: true, repeat: 1 })
-        gsap.timeline({ repeat: -1 })
-          .to('.shadow', { scaleX: 0.75, opacity: 0.12, duration: 0.42, ease: 'power2.out', transformOrigin: '50% 50%' })
-          .to('.shadow', { scaleX: 1, opacity: 0.2, duration: 0.38, ease: 'power2.in' })
-          .to({}, { duration: 0.2 })
-        gsap.to('.sparkle', { rotation: 30, scale: 0.7, duration: 0.9, yoyo: true, repeat: -1, stagger: 0.3, ease: 'sine.inOut', transformOrigin: '50% 50%' })
-      } else if (mood === 'mixed') {
-        gsap.timeline({ repeat: -1, yoyo: true })
-          .to('.figure', { rotation: -7, duration: 1.4, ease: 'sine.inOut', transformOrigin: '50% 100%' })
-          .to('.figure', { rotation: -3, duration: 1.2, ease: 'sine.inOut' })
-        gsap.to('.brow-r', { y: -3, duration: 0.6, yoyo: true, repeat: -1, repeatDelay: 1.5, ease: 'sine.inOut' })
-      } else if (mood === 'worried') {
-        gsap.to('.figure', { scaleY: 0.96, y: 4, duration: 1.8, yoyo: true, repeat: -1, ease: 'sine.inOut', transformOrigin: '50% 100%' })
-        gsap.to('.figure', { x: 2, duration: 0.12, yoyo: true, repeat: -1, repeatDelay: 2.5, ease: 'none' })
-        gsap.fromTo('.sweat-drop', { y: 0 }, { y: 14, duration: 1.4, repeat: -1, ease: 'power1.in', repeatDelay: 0.6 })
-      } else if (mood === 'searching') {
-        gsap.timeline({ repeat: -1 })
-          .to('.pupil', { x: -7, duration: 0.35, ease: 'power2.inOut' })
-          .to('.pupil', { x: 7, duration: 0.5, ease: 'power2.inOut', delay: 0.25 })
-          .to('.pupil', { x: 0, duration: 0.3, delay: 0.25 })
-        gsap.to('.figure', { y: -8, duration: 0.5, yoyo: true, repeat: -1, ease: 'sine.inOut' })
+      gsap.to('.figure', { y: -amp, duration: dur, yoyo: true, repeat: -1, ease: 'sine.inOut' })
+      gsap.to('.shadow', { scaleX: 0.92, opacity: 0.08, duration: dur, yoyo: true, repeat: -1, ease: 'sine.inOut', transformOrigin: '50% 50%' })
+      if (mood === 'searching') {
+        // An unhurried glance left and right while the records load.
+        gsap.fromTo('.face', { x: -3 }, { x: 3, duration: 1.8, yoyo: true, repeat: -1, ease: 'power1.inOut' })
       }
     }, root)
     return () => ctx.revert()
@@ -113,77 +82,49 @@ export default function Mascot({ mood = 'happy', className = '', title }) {
 
   useLayoutEffect(() => () => gsap.killTweensOf(root.current?.querySelectorAll('*') || []), [])
 
+  // The padded frame plus the viewBox headroom (antenna top ≈ y18, float ≤ 4) keep the whole
+  // character and its shadow inside the box at every point of the animation.
   return (
-    <svg
-      ref={root}
-      viewBox="0 0 200 230"
-      className={className}
-      role="img"
-      aria-label={title || `Building mascot looking ${mood}`}
-    >
-      <ellipse className="shadow" cx="100" cy="216" rx="62" ry="8" fill="#1d1a3a" opacity="0.2" />
+    <div className={`mascot-frame shrink-0 overflow-visible p-1.5 ${className}`}>
+      <svg
+        ref={root}
+        viewBox="0 0 200 240"
+        className="block h-full w-full overflow-visible"
+        role="img"
+        aria-label={title || `Building mascot looking ${mood}`}
+      >
+        <ellipse className="shadow" cx="100" cy="224" rx="56" ry="6" fill={INK} opacity="0.12" />
 
-      <g className="boing">
-        <g className="figure">
-          {/* antenna + chimney */}
-          <path d="M100 38 L100 18" stroke="#1d1a3a" strokeWidth="4" strokeLinecap="round" />
-          <circle cx="100" cy="14" r="7" fill="#ffd23f" stroke="#1d1a3a" strokeWidth="3" />
-          <rect className="shade" x="132" y="24" width="16" height="26" rx="5" fill={initial.shade} stroke="#1d1a3a" strokeWidth="3" />
+        <g className="settle">
+          <g className="figure">
+            {/* antenna */}
+            <path d="M100 44 L100 29" {...line} />
+            <circle cx="100" cy="24" r="4" fill="#fffaf0" stroke={INK} strokeWidth={STROKE} />
 
-          {/* body */}
-          <path
-            className="body"
-            d="M42 74 Q40 40 76 38 L124 38 Q160 40 158 74 L163 178 Q165 206 136 206 L64 206 Q35 206 37 178 Z"
-            fill={initial.body}
-            stroke="#1d1a3a"
-            strokeWidth="4"
-            strokeLinejoin="round"
-          />
-          {/* soft highlight */}
-          <path d="M56 70 Q56 52 74 50" stroke="#fff" strokeOpacity="0.55" strokeWidth="6" fill="none" strokeLinecap="round" />
+            {/* body */}
+            <rect className="body" x="48" y="44" width="104" height="162" rx="24" fill={initial.body} stroke={INK} strokeWidth={STROKE} />
+            {/* soft highlight */}
+            <path d="M62 70 Q62 58 74 58" stroke="#fff" strokeOpacity="0.5" strokeWidth={STROKE} strokeLinecap="round" fill="none" />
 
-          {/* windows + door */}
-          {[[58, 160], [120, 160]].map(([x, y]) => (
-            <rect key={x} className="win" x={x} y={y} width="22" height="20" rx="6" fill={initial.window} stroke="#1d1a3a" strokeWidth="3" />
-          ))}
-          <path d="M88 206 L88 178 Q88 166 100 166 Q112 166 112 178 L112 206" fill="#1d1a3a" />
-          <circle cx="106" cy="188" r="2" fill="#ffd23f" />
+            {/* windows + door */}
+            {[64, 116].map((x) => (
+              <rect key={x} x={x} y="150" width="20" height="18" rx="5" fill="#fffaf0" stroke={INK} strokeWidth={STROKE} />
+            ))}
+            <path className="door" d="M88 206 L88 180 Q88 170 100 170 Q112 170 112 180 L112 206" fill={initial.door} stroke={INK} strokeWidth={STROKE} strokeLinejoin="round" />
 
-          {/* cheeks */}
-          <ellipse className="cheek" cx="62" cy="122" rx="10" ry="6" fill={initial.cheek} />
-          <ellipse className="cheek" cx="138" cy="122" rx="10" ry="6" fill={initial.cheek} />
-
-          {/* eyes */}
-          {[78, 122].map((cx) => (
-            <g key={cx}>
-              <g className="eye">
-                <circle cx={cx} cy="98" r="15" fill="#fff" stroke="#1d1a3a" strokeWidth="3.5" />
-                <g className="pupil" transform={`translate(${initial.pupil.x} ${initial.pupil.y})`}>
-                  <circle cx={cx} cy="99" r="7" fill="#1d1a3a" />
-                  <circle cx={cx + 2.5} cy="96" r="2.2" fill="#fff" />
-                </g>
+            {/* face: stroke eyes, a faint brow line (worried only), one small mouth curve */}
+            <g className="face">
+              <path className="eye-l" d={initial.eyeL} {...line} />
+              <path className="eye-r" d={initial.eyeR} {...line} />
+              <g className="brow" opacity={initial.brow}>
+                <path className="brow-l" d={initial.browL} {...line} />
+                <path className="brow-r" d={initial.browR} {...line} />
               </g>
-              {/* droopy eyelid (worried) */}
-              <path className="lid" d={`M${cx - 16.5} 98 A16.5 16.5 0 0 1 ${cx + 16.5} 98 Z`} fill={initial.body} stroke="#1d1a3a" strokeWidth="3.5" opacity={initial.lid} />
+              <path className="mouth" d={initial.mouth} {...line} />
             </g>
-          ))}
-
-          {/* brows + mouth */}
-          <path className="brow-l" d={initial.browL} stroke="#1d1a3a" strokeWidth="5" fill="none" strokeLinecap="round" />
-          <path className="brow-r" d={initial.browR} stroke="#1d1a3a" strokeWidth="5" fill="none" strokeLinecap="round" />
-          <path className="mouth" d={initial.mouth} stroke="#1d1a3a" strokeWidth="5" fill="none" strokeLinecap="round" />
-
-          {/* sweat drop (worried) */}
-          <g className="sweat" opacity={initial.sweat}>
-            <path className="sweat-drop" d="M160 64 Q150 80 156 86 Q164 90 166 80 Q166 72 160 64 Z" fill="#bfe3ff" stroke="#1d1a3a" strokeWidth="2.5" />
           </g>
         </g>
-      </g>
-
-      {/* sparkles (happy) */}
-      <Sparkle x={24} y={60} s={1.2} visible={initial.sparkle} />
-      <Sparkle x={180} y={44} s={0.9} color="#6ee7b7" visible={initial.sparkle} />
-      <Sparkle x={182} y={140} s={0.7} color="#ffffff" visible={initial.sparkle} />
-    </svg>
+      </svg>
+    </div>
   )
 }

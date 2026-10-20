@@ -59,7 +59,8 @@ export default function App() {
         {view.name === 'loading' && <LoadingView query={view.query} />}
         {view.name === 'results' && (
           <>
-            <div className="mx-auto mb-6 w-full max-w-3xl px-4 sm:px-6">
+            {/* Positioned + z-50 so the suggestions list stacks over the (GSAP-transformed) results below. */}
+            <div className="relative z-50 mx-auto mb-6 w-full max-w-3xl px-4 sm:px-6">
               <AddressSearch onSearch={search} compact />
             </div>
             <Results key={view.record.place.bbl + view.record.fetchedAt} record={view.record} />
@@ -69,7 +70,7 @@ export default function App() {
           <StateMessage
             mood="mixed"
             title="Hmm, we couldn’t find that one"
-            action={<div className="w-[min(36rem,90vw)]"><AddressSearch onSearch={search} autoFocus /></div>}
+            action={<div className="relative z-50 w-[min(36rem,90vw)]"><AddressSearch onSearch={search} autoFocus /></div>}
           >
             We couldn’t match “{String(view.query)}” to a NYC building. Try a house number and street, like “350 5th Ave, Manhattan”.
           </StateMessage>
@@ -104,7 +105,7 @@ function Landing({ onSearch }) {
     const ctx = gsap.context(() => {
       gsap.timeline({ defaults: { ease: 'back.out(1.8)' } })
         .from('.word', { y: 60, rotation: () => gsap.utils.random(-12, 12), opacity: 0, duration: 0.7, stagger: 0.08 })
-        .from('.mascot-in', { scale: 0.4, opacity: 0, duration: 0.8, ease: 'elastic.out(1, 0.5)' }, '-=0.5')
+        .from('.mascot-in', { scale: 0.98, opacity: 0, duration: 1, ease: 'power1.out' }, '-=0.5')
         .from('.fade-up', { y: 24, opacity: 0, duration: 0.5, stagger: 0.1, ease: 'power3.out' }, '-=0.6')
     }, root)
     return () => ctx.revert()
@@ -133,7 +134,8 @@ function Landing({ onSearch }) {
         <p className="fade-up mt-5 max-w-lg text-lg text-ink/80 sm:text-xl">
           Type any NYC address. We pull the building’s public record — violations, 311 calls, building complaints, evictions — and turn it into plain-language flags.
         </p>
-        <div className="fade-up mt-7">
+        {/* fade-up leaves a transform (own stacking context), so lift this one above its siblings. */}
+        <div className="fade-up relative z-50 mt-7">
           <AddressSearch onSearch={onSearch} autoFocus />
         </div>
         <div className="fade-up mt-4 flex flex-wrap items-center gap-2 text-sm">
@@ -146,7 +148,7 @@ function Landing({ onSearch }) {
         </div>
         <p className="fade-up mt-6 text-sm font-bold">Based on public records, not advice. No login, nothing saved.</p>
       </div>
-      <div className="mascot-in order-1 flex justify-center md:order-2">
+      <div className="mascot-in order-1 flex justify-center overflow-visible py-4 md:order-2">
         <Mascot mood="happy" className="h-52 w-52 sm:h-72 sm:w-72 md:h-80 md:w-80" title="Happy building mascot" />
       </div>
     </section>

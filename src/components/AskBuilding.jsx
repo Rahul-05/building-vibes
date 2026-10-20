@@ -55,7 +55,9 @@ export default function AskBuilding({ summary, mood }) {
       </h2>
 
       <div className="mt-5 flex items-end gap-3 sm:gap-4">
-        <Mascot mood={asking ? 'searching' : mood} className="h-24 w-24 shrink-0 sm:h-28 sm:w-28" title="Vibe, the building mascot" />
+        <div className="shrink-0 overflow-visible pt-2">
+          <Mascot mood={asking ? 'searching' : mood} className="h-24 w-24 sm:h-28 sm:w-28" title="Vibe, the building mascot" />
+        </div>
         <div className="min-w-0 flex-1 space-y-3 pb-2" aria-live="polite">
           {exchange && (
             <p className="asked-bubble ml-auto w-fit max-w-[90%] rounded-2xl rounded-br-md border-[2.5px] border-ink bg-sunny px-4 py-2 font-medium">

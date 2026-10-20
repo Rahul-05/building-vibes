@@ -69,7 +69,7 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
   const showList = open && suggestions.length > 0
 
   return (
-    <form onSubmit={submit} role="search" className="relative w-full">
+    <form onSubmit={submit} role="search" className="relative z-50 w-full">
       <label htmlFor={`${listId}-input`} className="sr-only">NYC address</label>
       <div className={`pop flex items-center gap-2 bg-paper ${compact ? 'p-1.5 pl-4' : 'p-2 pl-5 sm:p-2.5 sm:pl-6'}`}>
         <MapPin aria-hidden className="shrink-0 text-bubblegum" size={compact ? 20 : 26} strokeWidth={2.5} />
@@ -101,7 +101,11 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
       </div>
 
       {showList && (
-        <ul id={listId} role="listbox" className="pop-sm absolute inset-x-2 top-full z-30 mt-2 overflow-hidden bg-paper text-left">
+        <ul
+          id={listId}
+          role="listbox"
+          className="absolute inset-x-2 top-full z-[60] mt-2 max-h-80 overflow-y-auto rounded-2xl border-[2.5px] border-ink bg-paper text-left shadow-pop-sm"
+        >
           {suggestions.map((s, i) => (
             <li
               key={`${s.bbl}-${s.label}`}

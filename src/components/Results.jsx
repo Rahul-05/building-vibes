@@ -50,10 +50,15 @@ export default function Results({ record }) {
     <div ref={root} className="mx-auto w-full max-w-3xl space-y-6 px-4 pb-16 sm:px-6">
       {celebrate && <Confetti />}
 
-      <section className={`hero pop relative overflow-hidden p-5 sm:p-8 ${HERO_BG[mood]}`}>
-        <div aria-hidden className="absolute -right-16 -top-16 h-48 w-48 rounded-full border-[3px] border-ink bg-paper/30" />
+      <section className={`hero pop relative p-5 sm:p-8 ${HERO_BG[mood]}`}>
+        {/* Only the decoration is clipped to the card, so the floating mascot never is. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[25px]">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full border-[3px] border-ink bg-paper/30" />
+        </div>
         <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-          <Mascot mood={shownMood} className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" title={`Mascot mood: ${MOOD_COPY[mood].label}`} />
+          <div className="shrink-0 overflow-visible py-2">
+            <Mascot mood={shownMood} className="h-44 w-44 sm:h-52 sm:w-52" title={`Mascot mood: ${MOOD_COPY[mood].label}`} />
+          </div>
           <div className="min-w-0">
             <p className="text-sm font-bold uppercase tracking-widest opacity-70">{place.borough}</p>
             <h1 className="mt-1 break-words text-3xl font-extrabold leading-tight sm:text-4xl">{place.name}</h1>
