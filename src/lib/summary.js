@@ -116,7 +116,48 @@ function ownershipSummary(o, s) {
   return Object.keys(out).length ? out : null
 }
 
-export function buildSummary(record, { flags, counts, mood }) {
+// Phase 4 context: building facts, per apartment rates, borough comparison, trend, fix rate.
+function buildingSummary(record, insights) {
+  const b = record.building
+  if (b?.error) return UNAVAILABLE
+  if (!b) return 'no PLUTO tax lot record found'
+  return { yearBuilt: b.yearBuilt || undefined, apartments: b.unitsRes || undefined, buildingsOnTaxLot: b.buildings > 1 ? b.buildings : undefined, note: insights.units ? undefined : 'no apartment count, so flags use plain counts' }
+}
+
+function perApartmentSummary(record, units) {
+  const v = record.violations
+  if (!units || !v || v.error) return undefined
+  const r = (n) => Math.round((n / units) * 100) / 100
+  return { openViolations: r(v.openTotal), openClassC: r(v.openByClass.C) }
+}
+
+function comparisonSummary(b) {
+  if (b.unavailable) return b.unavailable
+  return { openViolations: b.lines.all, openClassC: b.lines.classC, basis: b.basis, note: 'context from the record, not a ranking of quality' }
+}
+
+function trendSummary(t) {
+  if (t.unavailable) return UNAVAILABLE
+  return {
+    direction: t.headline,
+    detail: t.detail,
+    byYear: t.years.map((y) => ({ year: y.partial ? `${y.year} so far` : y.year, hpdViolations: y.violations ?? undefined, buildingComplaints311: y.complaints ?? undefined })),
+  }
+}
+
+function fixRateSummary(f) {
+  if (f.unavailable) return UNAVAILABLE
+  return {
+    summary: f.sentence,
+    violationsIssuedLast5Years: f.issued,
+    percentMarkedClosed: f.issued ? Math.round(f.closedShare * 100) : undefined,
+    medianDaysToClose: f.medianDays ?? undefined,
+    openMoreThanAYear: f.openOverYear,
+    oldestOpenYear: f.oldestOpenYear ?? undefined,
+  }
+}
+
+export function buildSummary(record, { flags, counts, mood }, insights) {
   return {
     address: [record.place.name, record.place.borough].filter(Boolean).join(', '),
     checkedOn: day(record.fetchedAt),
@@ -132,6 +173,13 @@ export function buildSummary(record, { flags, counts, mood }) {
     hpdHousingCourtCases: litigationSummary(record.litigations),
     bedbugReports: bedbugSummary(record.bedbugs),
     ownershipAndLastSale: ownershipSummary(record.ownership, record.lastSale),
+    ...(insights && {
+      building: buildingSummary(record, insights),
+      openViolationsPerApartment: perApartmentSummary(record, insights.units),
+      comparedWithBorough: comparisonSummary(insights.benchmark),
+      trend: trendSummary(insights.trend),
+      fixRate: fixRateSummary(insights.fixRate),
+    }),
   }
 }
 
@@ -145,6 +193,8 @@ export function templateStory(summary) {
   if (topTheme) parts.push(`The most common 311 topic in the last 2 years is ${topTheme.theme.toLowerCase()} (${plural(topTheme.count, 'complaint')}).`)
   if (topIssue) parts.push(`Among the open HPD violations: “${topIssue.issue}” (${plural(topIssue.count, 'listing')}).`)
   if (summary.alternativeEnforcementProgram?.onAepListNow) parts.push('It is currently in HPD’s Alternative Enforcement Program, the city’s list of buildings with the worst conditions.')
+  if (summary.trend?.direction) parts.push(`${summary.trend.direction}. ${summary.trend.detail}`)
+  if (summary.comparedWithBorough?.openViolations) parts.push(summary.comparedWithBorough.openViolations)
   if (summary.vacateOrders?.notLifted) parts.push(`HPD has ${plural(summary.vacateOrders.notLifted, 'vacate order')} here that hasn’t been lifted.`)
   const loaded = [summary.hpdViolations, summary.complaints311].every((s) => s && typeof s === 'object')
   if (!topIssue && !topTheme && loaded) parts.push('Not much shows up in the recent records we checked.')

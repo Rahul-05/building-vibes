@@ -89,11 +89,11 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
           aria-expanded={showList}
           aria-controls={listId}
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
-          className={`min-w-0 flex-1 bg-transparent font-medium placeholder:text-ink/40 focus:outline-none ${compact ? 'text-base' : 'text-lg sm:text-xl'}`}
+          className={`min-w-0 flex-1 bg-transparent font-medium placeholder:text-ink/40 focus:outline-none ${compact ? 'text-base' : 'text-base sm:text-xl'}`}
         />
         <button
           type="submit"
-          className={`pop-sm press flex shrink-0 items-center gap-2 bg-ink font-display font-bold text-cream hover:bg-bubblegum hover:text-ink ${compact ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base sm:px-6 sm:text-lg'}`}
+          className={`pop-sm press flex shrink-0 items-center gap-2 bg-ink font-display font-bold text-cream hover:bg-bubblegum hover:text-ink ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'whitespace-nowrap px-3.5 py-3 text-base sm:px-6 sm:text-lg'}`}
         >
           <Search aria-hidden size={compact ? 16 : 20} strokeWidth={3} />
           <span className={compact ? 'sr-only sm:not-sr-only' : ''}>Check vibes</span>
@@ -117,8 +117,8 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
               className={`flex cursor-pointer items-center gap-3 px-4 py-3 ${i === active ? 'bg-sunny' : 'hover:bg-lilac'}`}
             >
               <MapPin aria-hidden size={16} className="shrink-0" />
-              <span className="font-medium">{s.name}</span>
-              <span className="ml-auto text-sm text-ink/60">{s.borough}</span>
+              <span className="min-w-0 font-medium">{s.name}</span>
+              <span className="ml-auto shrink-0 text-sm text-ink/60">{s.borough}</span>
             </li>
           ))}
         </ul>

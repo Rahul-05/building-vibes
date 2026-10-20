@@ -28,6 +28,10 @@
   body {
     @apply bg-cream font-sans text-ink antialiased;
     min-height: 100dvh;
+    /* Long record strings (owner names, case types) wrap instead of pushing the page sideways.
+       clip (not hidden) keeps the backdrop blobs from adding a horizontal scroll without breaking sticky. */
+    overflow-wrap: break-word;
+    overflow-x: clip;
   }
   h1, h2, h3 {
     @apply font-display;
@@ -45,6 +49,15 @@
   }
   .pop-sm {
     @apply rounded-2xl border-[2.5px] border-ink shadow-pop-sm;
+  }
+  /* Badge pattern: a text line with a pill beside it is a .badge-row, which wraps only BETWEEN
+     its children; the .pill itself never breaks or shrinks, so on a narrow screen it drops whole
+     to the next line. Text children of a .badge-row should be their own <span>. */
+  .badge-row {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-1;
+  }
+  .pill {
+    @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-full;
   }
   .press {
     @apply transition-transform duration-150 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none;

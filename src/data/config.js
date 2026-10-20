@@ -20,6 +20,8 @@ export const DATASETS = {
   registrationContacts: 'feu5-w2e2', // HPD Registration Contacts
   acrisLegals: '8h5j-fqxa', // ACRIS Real Property Legals (document → borough/block/lot)
   acrisMaster: 'bnx9-e6tj', // ACRIS Real Property Master (document type, date, amount)
+  // Phase 4 "Smarts"
+  pluto: '64uk-42ks', // Primary Land Use Tax Lot Output (apartment count, year built, building class)
 }
 
 // How far back we look for "recent" activity, in years.

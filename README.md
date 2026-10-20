@@ -44,6 +44,9 @@ address text ──► NYC GeoSearch ──► BBL + BIN
 | `src/data/geosearch.js` | Address → place (`bbl`, `bin`, borough/block/lot); autocomplete suggestions. |
 | `src/data/hpd.js`, `complaints311.js`, `dob.js`, `evictions.js` | One module per dataset, each returns a small normalized object. |
 | `src/data/aep.js`, `bedbugs.js`, `litigations.js`, `vacateOrders.js`, `ownership.js`, `sales.js` | Phase 3 "Deeper record" sources, same pattern. |
+| `src/data/pluto.js`, `history.js` | Phase 4: PLUTO building facts; violation and 311 history for the trend and fix rate. |
+| `src/data/benchmarks.json`, `benchmarks.js` | Phase 4: committed borough benchmark snapshot (built by `scripts/build-benchmarks.mjs`) and its `benchmarksMeta`. |
+| `src/lib/insights.js` | Phase 4: apartment count, borough comparison, trend, fix rate (context only, never flags). |
 | `src/data/dobCategories.js` | DOB complaint category code → description (from DOB's official list). |
 | `src/lib/scoring.js` | Transparent flag rules + mood. The same rule text is shown in the UI under "How we pick flags". |
 | `src/lib/plainLanguage.js` | Strips legal citations from HPD text, sentence-cases it, labels 311 types. |
@@ -110,6 +113,20 @@ The ACRIS join was cross-checked with the Parties dataset (`636b-3b5g`). In both
 - **Condo buildings**: ACRIS records deeds against each unit's own lot, not the building's billing lot, so the last-sale line usually doesn't appear for condos.
 - **No portfolio features.** Owner and agent names are shown for this building only and are never used to look up other buildings.
 
+## Phase 4: Smarts (schemas verified 2026-10-20)
+
+| Dataset | ID | Filter used | Notes |
+|---|---|---|---|
+| PLUTO (Primary Land Use Tax Lot Output) | `64uk-42ks` | numeric `bbl` | `unitsres`, `unitstotal`, `yearbuilt`, `bldgclass`, `numbldgs`; version 26v2. One row per tax lot; 0 means unknown. |
+
+- **Building facts** in the header: "Built 1969 · 101 apartments" (plus "across N buildings on this tax lot" when PLUTO lists more than one).
+- **Per apartment scoring.** Where PLUTO has `unitsres`, the Class C red, Class B, heat, plumbing and eviction thresholds also need a rate of at least 1 for every N apartments (`EVERY` in `scoring.js`). Small buildings clear the rate as soon as they clear the count, so nothing changes for them; big buildings aren't flagged for size alone. Elevator, court cases, DOB and the city lists stay plain counts. No apartment count (or PLUTO down) means the plain thresholds, and the explainer says which basis was used.
+- **How it compares.** `node scripts/build-benchmarks.mjs` (about 2 minutes) pages through every PLUTO lot with residential units (767,563) and HPD open Class A/B/C violations grouped by `bbl` (147,504 lots), joins them on BBL (98.6% of open violations land on a residential lot), and writes per borough, per size group (1 to 2 apartments, 3 or more) percentiles and deciles of open violations per apartment, all classes and Class C. The app reads the snapshot; nothing is computed against the whole city at runtime. Current snapshot: 2026-10-20. Rerun the script to refresh it.
+- **Trend** (`trendFor`): HPD violations issued plus building related 311 complaints, last 12 full months against the 12 before, and a per year sparkline over 5 years.
+- **Fix rate** (`fixRateFor`): share of the last 5 years' violations marked closed, median days from notice to close (`currentstatusdate` minus `novissueddate`), open violations older than a year.
+- **Compare mode**: pin up to 3 buildings into a tray held in React state only (no storage); "View comparison" shows a factual side by side table (stacked cards on phones). No winner.
+- Network errors (dropped connections) now get the same single retry as timeouts, since a lookup makes more requests than before.
+
 ## Flag rules (Phase 1)
 See `RULES` in `src/lib/scoring.js`. They're shown verbatim in the app. In summary:
 - Open Class C violations: 3+ red, 1–2 yellow, 0 green. Open Class B: 10+ yellow.
@@ -118,6 +135,7 @@ See `RULES` in `src/lib/scoring.js`. They're shown verbatim in the app. In summa
 - Active DOB complaints about safety or upkeep: yellow. No DOB complaints in 3 yrs: green.
 - Residential evictions in 5 yrs: 6+ red, 2–5 yellow, 0 green.
 - Phase 3: currently in AEP → red. Vacate order not lifted → red (yellow for both if the record is for another building on the same lot). HPD court cases opened in 5 yrs: 15+ red, 5–14 or any pending yellow, 0 green. Harassment finding in 5 yrs → red. Latest bedbug filing (reporting year ended within 2 yrs): 5+ infested units or 10%+ of units red, 1+ yellow. A missing or zero filing never counts as green.
+- Phase 4: where the apartment count is known, the Class C red, Class B, heat, plumbing and eviction thresholds also need a minimum rate per apartment (see above).
 - Mascot mood: 2+ red or 4+ yellow → worried. 1 red or 2–3 yellow → mixed. Otherwise happy.
 
 ## Phase 2: AI building story + Q&A

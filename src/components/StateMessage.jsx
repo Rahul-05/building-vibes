@@ -6,8 +6,8 @@ export default function StateMessage({ mood = 'mixed', title, children, action }
     <section className="flex flex-col items-center px-6 py-10 text-center" role="status">
       <Mascot mood={mood} className="h-48 w-48" />
       <h2 className="mt-4 text-3xl font-extrabold">{title}</h2>
-      <div className="mt-2 max-w-md text-lg text-ink/75">{children}</div>
-      {action && <div className="mt-6">{action}</div>}
+      <div className="mt-2 max-w-md text-lg text-ink/75 wrap-anywhere">{children}</div>
+      {action && <div className="mt-6 flex w-full justify-center">{action}</div>}
     </section>
   )
 }

@@ -22,8 +22,19 @@ const TEMPLATES = {
 // Questions driven by facts that aren't flags on their own.
 const RECENT_SALE_YEARS = 2
 
-function recordQuestions(record) {
+function recordQuestions(record, insights) {
   const qs = []
+  const fix = insights?.fixRate
+  if (fix?.openOverYear > 0) {
+    const n = fix.openOverYear
+    const text = n === 1
+      ? `HPD lists 1 violation from ${fix.oldestOpenYear} that is still open after more than a year. What is the plan to close it?`
+      : `HPD lists ${n.toLocaleString()} violations that are still open after more than a year, the oldest from ${fix.oldestOpenYear}. What is the plan to close them?`
+    qs.push({ id: 'long-open', level: 'yellow', text })
+  }
+  if (insights?.trend?.direction === 'up') {
+    qs.push({ id: 'trend-up', level: 'general', text: 'Reports to HPD and 311 have gone up over the last year. What is behind the increase, and what is being done about it?' })
+  }
   const lifted = record?.vacateOrders?.orders?.find((o) => o.lifted)
   if (lifted && !record.vacateOrders.inEffect) {
     const when = lifted.effectiveDate?.slice(0, 4)
@@ -45,12 +56,12 @@ const GENERAL = [
   'Is this apartment rent stabilized? Can I see the rent history?',
 ]
 
-export function questionsFor(flags, record, max = 5) {
+export function questionsFor(flags, record, max = 5, insights) {
   const qs = flags
     .filter((f) => f.level !== 'green' && TEMPLATES[f.id])
     .map((f) => ({ id: f.id, level: f.level, text: TEMPLATES[f.id] }))
     .slice(0, max)
-  qs.push(...recordQuestions(record))
+  qs.push(...recordQuestions(record, insights))
   // Always offer a couple of general questions so the list is never empty.
   GENERAL.forEach((text, i) => qs.length < max + 1 && qs.push({ id: `general-${i}`, level: 'general', text }))
   return qs

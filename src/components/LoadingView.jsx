@@ -38,7 +38,7 @@ export default function LoadingView({ query }) {
         ))}
       </div>
       <p className="mt-6 font-display text-2xl font-bold sm:text-3xl">{MESSAGES[i]}</p>
-      {typeof query === 'string' && <p className="mt-2 text-ink/60">“{query}”</p>}
+      {typeof query === 'string' && <p className="mt-2 max-w-full text-ink/60 wrap-anywhere">“{query}”</p>}
     </section>
   )
 }

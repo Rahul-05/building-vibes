@@ -12,11 +12,11 @@ const SAME_LOT = 'This is for another building on the same tax lot; we couldn’
 function Block({ icon: Icon, title, accent, children }) {
   return (
     <div className="pop-sm bg-paper p-4 sm:p-5">
-      <h3 className="flex items-center gap-2 font-display text-lg font-bold">
+      <h3 className="flex items-center gap-2 font-display text-lg font-bold leading-tight">
         <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border-2 border-ink ${accent}`}>
           <Icon aria-hidden size={17} strokeWidth={2.5} />
         </span>
-        {title}
+        <span className="min-w-0">{title}</span>
       </h3>
       <div className="mt-3 space-y-3">{children}</div>
     </div>
@@ -30,20 +30,19 @@ const Unavailable = ({ what }) => (
 )
 const Quiet = ({ children }) => <p className="rounded-xl bg-ink/5 p-3 text-sm font-medium text-ink/75">{children}</p>
 const Note = ({ children }) => <p className="text-xs text-ink/55">{children}</p>
-const Badge = ({ cls, children }) => (
-  <span className={`shrink-0 rounded-full border-2 border-ink px-2.5 py-0.5 text-xs font-bold ${cls}`}>{children}</span>
-)
+const Badge = ({ cls, children }) => <span className={`pill border-2 border-ink px-2.5 py-0.5 text-xs font-bold ${cls}`}>{children}</span>
 
 function StatusBlock({ aep, vacate }) {
   const hasAep = aep && !aep.error && aep.listings.length > 0
   const hasVacate = vacate && !vacate.error && vacate.orders.length > 0
-  // Not being on these lists isn't informative on its own, so the block only appears when there's something to show.
-  if (!hasAep && !hasVacate && !aep?.error && !vacate?.error) return null
+  // Not being on the vacate list says little, but AEP absence is worth stating, so the block shows whenever the AEP list loaded.
+  if (!aep && !hasVacate && !vacate?.error) return null
 
   const listing = hasAep ? aep.listings.find((l) => l.active) || aep.listings[0] : null
   return (
     <Block icon={Siren} title="Building status" accent="bg-tomato">
       {aep?.error && <Unavailable what="The AEP list" />}
+      {aep && !aep.error && !hasAep && <Quiet>Not on the Alternative Enforcement Program list (the city’s worst conditions list).</Quiet>}
       {listing && (
         <div className={`rounded-xl p-3 ${listing.active ? 'bg-tomato/15' : 'bg-ink/5'}`}>
           <p className="font-bold">
@@ -65,7 +64,7 @@ function StatusBlock({ aep, vacate }) {
           <ul className="mt-1 divide-y-2 divide-dashed divide-ink/15">
             {vacate.orders.slice(0, 4).map((o) => (
               <li key={o.id} className="flex items-start justify-between gap-3 py-2">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium">{[o.type && `${o.type} vacate`, o.reason.toLowerCase()].filter(Boolean).join(' · ')}</p>
                   <p className="text-sm text-ink/55">
                     {formatDate(o.effectiveDate)}
@@ -93,16 +92,16 @@ function CourtBlock({ data }) {
         <Quiet>No HPD housing court cases found in the public record.</Quiet>
       ) : (
         <>
-          <p className="font-medium">
-            {plural(data.recentTotal, 'case')} opened in the last 5 years
-            {data.open > 0 && <span className="ml-2 rounded-full bg-sunny px-2 py-0.5 text-xs font-bold">{data.open} pending</span>}
+          <p className="badge-row font-medium">
+            <span>{plural(data.recentTotal, 'case')} opened in the last 5 years</span>
+            {data.open > 0 && <Badge cls="bg-sunny">{data.open} pending</Badge>}
           </p>
           {data.byType.length > 0 && (
             <ul className="space-y-1 text-sm">
               {data.byType.slice(0, 4).map((t) => (
                 <li key={t.type} className="flex justify-between gap-3">
-                  <span>{t.type}</span>
-                  <span className="font-display font-extrabold">{t.count}</span>
+                  <span className="min-w-0">{t.type}</span>
+                  <span className="shrink-0 font-display font-extrabold">{t.count}</span>
                 </li>
               ))}
             </ul>
@@ -156,8 +155,10 @@ function DeedLine({ label, deed }) {
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-wide text-ink/55">{label}</p>
-      <p className="font-medium">
-        {formatDate(deed.date)} · {deed.amount > 0 ? money(deed.amount) : 'no sale price recorded'}
+      <p className="badge-row font-medium">
+        <span className="whitespace-nowrap">{formatDate(deed.date)}</span>
+        <span aria-hidden className="text-ink/40">·</span>
+        <span>{deed.amount > 0 ? money(deed.amount) : 'no sale price recorded'}</span>
       </p>
       {deed.lots > 1 && <Note>This deed covered {deed.lots} tax lots, so the amount is for all of them.</Note>}
     </div>
@@ -174,19 +175,19 @@ function OwnershipBlock({ owner, sale }) {
           {owner.owners.length > 0 && (
             <div>
               <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">Owner</dt>
-              <dd className="font-medium">{owner.owners.join(', ')}</dd>
+              <dd className="font-medium wrap-anywhere">{owner.owners.join(', ')}</dd>
             </div>
           )}
           {owner.managingAgent && (
             <div>
               <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">Managing agent</dt>
-              <dd className="font-medium">{owner.managingAgent}</dd>
+              <dd className="font-medium wrap-anywhere">{owner.managingAgent}</dd>
             </div>
           )}
           {owner.headOfficer && (
             <div>
               <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">Head officer</dt>
-              <dd className="font-medium">{owner.headOfficer}</dd>
+              <dd className="font-medium wrap-anywhere">{owner.headOfficer}</dd>
             </div>
           )}
           <Note>From the building’s HPD registration, last filed {formatDate(owner.registeredOn)}.</Note>

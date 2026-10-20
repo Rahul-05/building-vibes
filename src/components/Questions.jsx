@@ -11,8 +11,8 @@ export default function Questions({ questions }) {
       <ol className="mt-5 space-y-3">
         {questions.map((q, i) => (
           <li key={q.id} className="pop-sm flex items-start gap-3 bg-paper p-4">
-            <span className="font-display text-xl font-extrabold text-bubblegum">{i + 1}</span>
-            <p className="flex-1 font-medium">{q.text}</p>
+            <span className="w-5 shrink-0 font-display text-xl font-extrabold text-bubblegum">{i + 1}</span>
+            <p className="min-w-0 flex-1 font-medium">{q.text}</p>
             {q.level !== 'general' && <FlagDot level={q.level} size="mt-1.5 h-3 w-3" />}
           </li>
         ))}

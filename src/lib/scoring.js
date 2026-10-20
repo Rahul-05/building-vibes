@@ -4,22 +4,41 @@
 // Flag shape: { id, level: 'red'|'yellow'|'green', title, reason, source }
 
 import { plural } from './plainLanguage.js'
+import { FIX, TREND, ratePhrase, unitsFor } from './insights.js'
 
 const PEST_RE = /\b(MICE|ROACHES|RATS|BED ?BUGS|VERMIN|INFESTATION)\b/i
 const MOLD_RE = /\bMOLD\b/i
 const LEAD_RE = /\bLEAD\b/i
 const HEAT_RE = /\b(HEAT|HOT WATER)\b/i
 
+// Phase 4 fairness fix: where PLUTO gives the apartment count, a count must reach its old raw
+// threshold AND a rate of at least 1 for every N apartments. Small buildings are unchanged
+// (they clear the rate as soon as they clear the count); big buildings aren't flagged just for size.
+// Without an apartment count, only the raw thresholds apply, exactly as before.
+export const EVERY = {
+  classCRed: 10,
+  classBYellow: 2,
+  heatRed: 5,
+  heatYellow: 20,
+  plumbing: 5,
+  evictionsRed: 20,
+  evictionsYellow: 50,
+}
+
+// count reaches "at least 1 for every `every` apartments" (always true when units are unknown).
+const meetsRate = (count, units, every) => !units || count * every >= units
+
 export const RULES = [
-  'Open Class C (immediately hazardous) HPD violations: 3 or more is a red flag, 1 or 2 is yellow, none is green.',
-  'Open Class B (hazardous) HPD violations: 10 or more is a yellow flag.',
+  `Open Class C (immediately hazardous) HPD violations: 3 or more is a red flag when that is also at least 1 for every ${EVERY.classCRed} apartments; any other number above zero is yellow; none is green.`,
+  `Open Class B (hazardous) HPD violations: 10 or more, and at least 1 for every ${EVERY.classBYellow} apartments, is a yellow flag.`,
   'Open HPD violations mentioning lead paint: any is a red flag.',
   'Open HPD violations mentioning pests or mold: any is a yellow flag.',
-  'Heat or hot water 311 complaints in the last 2 years: 10 or more is red, 3 to 9 is yellow, none is green.',
-  'Plumbing or leak 311 complaints in the last 2 years: 10 or more is a yellow flag.',
-  'Elevator 311 complaints in the last 2 years: 5 or more is a yellow flag.',
+  `Heat or hot water 311 complaints in the last 2 years: 10 or more, and at least 1 for every ${EVERY.heatRed} apartments, is red; 3 or more, and at least 1 for every ${EVERY.heatYellow} apartments, is yellow; none is green.`,
+  `Plumbing or leak 311 complaints in the last 2 years: 10 or more, and at least 1 for every ${EVERY.plumbing} apartments, is a yellow flag.`,
+  'Elevator 311 complaints in the last 2 years: 5 or more is a yellow flag. This stays a plain count, since one elevator serves the whole building.',
   'Active DOB complaints about safety or upkeep: any is a yellow flag. No DOB complaints in 3 years is green.',
-  'Residential evictions in the last 5 years: 6 or more is red, 2 to 5 is yellow, none is green.',
+  `Residential evictions in the last 5 years: 6 or more, and at least 1 for every ${EVERY.evictionsRed} apartments, is red; 2 or more, and at least 1 for every ${EVERY.evictionsYellow} apartments, is yellow; none is green.`,
+  'Apartment counts: the “for every N apartments” parts use the residential unit count for the whole tax lot from the city’s PLUTO data, the same lot the violation, 311 and eviction counts cover. A small building clears the rate as soon as it clears the count, so its flags work just as before. When PLUTO has no apartment count for the lot (or doesn’t load), those parts are skipped and the plain counts alone decide.',
   'Currently in HPD’s Alternative Enforcement Program (the city’s list of buildings with the worst conditions): red flag. If the listing is for a different building on the same tax lot, yellow. A past, finished AEP listing is shown but not flagged.',
   'HPD vacate order that hasn’t been lifted (no rescind date on or before today): red flag, or yellow if it’s for a different building on the same tax lot. Lifted orders are shown but not flagged.',
   'HPD housing court cases opened in the last 5 years: 15 or more is red, 5 to 14 is yellow, none is green. Any case still pending makes it at least yellow. If none of the lot’s cases match this exact building, the lot’s cases are counted and labeled that way.',
@@ -28,20 +47,33 @@ export const RULES = [
   'Mascot mood: 2 or more red or 4 or more yellow flags means worried; 1 red or 2 or 3 yellow means mixed; otherwise happy.',
 ]
 
+// Context shown next to the flags. Documented here so the explainer matches the code; none of it
+// adds or removes a flag or moves the mascot.
+export const CONTEXT_RULES = [
+  'How it compares, the trend and the fix rate are context only. They never add or remove a flag and never change the mascot’s mood.',
+  'How it compares: open HPD violations (Class A, B and C) divided by the lot’s apartment count, placed among every tax lot in the same borough and size group (1 or 2 apartments, or 3 or more) in a snapshot of NYC Open Data. Lots with no open violations count as zero. The snapshot stores each group’s percentiles, so the share is given to the nearest point and always says “about”.',
+  `Trend: HPD violations issued plus 311 complaints about conditions in the building, in the last 12 full months compared with the 12 months before. At least ${Math.round((TREND.up - 1) * 100)}% more (and at least ${TREND.minChange} more) reads as climbing; at least ${Math.round((1 - TREND.down) * 100)}% fewer (and at least ${TREND.minChange} fewer) reads as eased; anything else reads as about steady. Fewer than ${TREND.minReports} reports across both years is too few to call.`,
+  `Fix rate: of the HPD violations issued in the last 5 years, the share whose status is closed (HPD counts dismissed ones as closed too). The typical fix is the median number of days from the notice to the date the status changed to closed, shown once at least ${FIX.minClosedForMedian} are closed. “More than a year old” counts open Class A, B and C violations issued over a year ago.`,
+]
+
 function count311(complaints, predicate) {
   if (!complaints || complaints.error) return null
   return complaints.byType.filter((t) => predicate(t.type)).reduce((n, t) => n + t.count, 0)
 }
 
-function violationFlags(v, flags) {
+// "12 open Class C violations, about 1 for every 8 apartments"
+const withRate = (text, count, units) => (units ? `${text}, ${ratePhrase(count, units)}` : text)
+
+function violationFlags(v, flags, units) {
   if (!v || v.error) return
   const { C, B } = v.openByClass
 
-  if (C >= 3) flags.push({ id: 'class-c', level: 'red', source: 'HPD', title: 'Open hazardous violations', reason: `${plural(C, 'open Class C violation')}. Class C is HPD's "immediately hazardous" category.` })
-  else if (C > 0) flags.push({ id: 'class-c', level: 'yellow', source: 'HPD', title: 'Open hazardous violation', reason: `${plural(C, 'open Class C violation')}. Class C is HPD's "immediately hazardous" category.` })
+  const cReason = `${withRate(plural(C, 'open Class C violation'), C, units)}. Class C is HPD's "immediately hazardous" category.`
+  if (C >= 3 && meetsRate(C, units, EVERY.classCRed)) flags.push({ id: 'class-c', level: 'red', source: 'HPD', title: 'Open hazardous violations', reason: cReason })
+  else if (C > 0) flags.push({ id: 'class-c', level: 'yellow', source: 'HPD', title: C === 1 ? 'Open hazardous violation' : 'Open hazardous violations', reason: cReason })
   else flags.push({ id: 'class-c', level: 'green', source: 'HPD', title: 'No open Class C violations', reason: 'No "immediately hazardous" HPD violations are currently open.' })
 
-  if (B >= 10) flags.push({ id: 'class-b', level: 'yellow', source: 'HPD', title: 'Many open Class B violations', reason: `${plural(B, 'open Class B violation')}. Class B is HPD's "hazardous" category.` })
+  if (B >= 10 && meetsRate(B, units, EVERY.classBYellow)) flags.push({ id: 'class-b', level: 'yellow', source: 'HPD', title: 'Many open Class B violations', reason: `${withRate(plural(B, 'open Class B violation'), B, units)}. Class B is HPD's "hazardous" category.` })
 
   // Keyword checks run on the sample of open violations we fetched (up to 60, most severe first).
   const descs = v.openItems.map((i) => i.description)
@@ -61,16 +93,17 @@ function violationFlags(v, flags) {
   if (mold) flags.push({ id: 'mold', level: 'yellow', source: 'HPD', title: 'Mold violations', reason: mentions(mold, 'mold') })
 }
 
-function complaintFlags(c, flags) {
+function complaintFlags(c, flags, units) {
   const heat = count311(c, (t) => HEAT_RE.test(t))
   if (heat === null) return
 
-  if (heat >= 10) flags.push({ id: 'heat', level: 'red', source: '311', title: 'Frequent heat complaints', reason: `${plural(heat, 'heat or hot water complaint')} to 311 in the last 2 years.` })
-  else if (heat >= 3) flags.push({ id: 'heat', level: 'yellow', source: '311', title: 'Some heat complaints', reason: `${plural(heat, 'heat or hot water complaint')} to 311 in the last 2 years.` })
+  const heatReason = `To 311 in the last 2 years: ${withRate(plural(heat, 'heat or hot water complaint'), heat, units)}.`
+  if (heat >= 10 && meetsRate(heat, units, EVERY.heatRed)) flags.push({ id: 'heat', level: 'red', source: '311', title: 'Frequent heat complaints', reason: heatReason })
+  else if (heat >= 3 && meetsRate(heat, units, EVERY.heatYellow)) flags.push({ id: 'heat', level: 'yellow', source: '311', title: 'Some heat complaints', reason: heatReason })
   else if (heat === 0) flags.push({ id: 'heat', level: 'green', source: '311', title: 'No heat complaints', reason: 'No heat or hot water complaints to 311 in the last 2 years.' })
 
   const plumbing = count311(c, (t) => /PLUMBING|WATER LEAK/i.test(t) && !/Construction/i.test(t))
-  if (plumbing >= 10) flags.push({ id: 'plumbing', level: 'yellow', source: '311', title: 'Plumbing & leak complaints', reason: `${plural(plumbing, 'plumbing or leak complaint')} to 311 in the last 2 years.` })
+  if (plumbing >= 10 && meetsRate(plumbing, units, EVERY.plumbing)) flags.push({ id: 'plumbing', level: 'yellow', source: '311', title: 'Plumbing & leak complaints', reason: `To 311 in the last 2 years: ${withRate(plural(plumbing, 'plumbing or leak complaint'), plumbing, units)}.` })
 
   const elevator = count311(c, (t) => /^ELEVATOR$/i.test(t))
   if (elevator >= 5) flags.push({ id: 'elevator', level: 'yellow', source: '311', title: 'Elevator complaints', reason: `${plural(elevator, 'elevator complaint')} to 311 in the last 2 years.` })
@@ -83,10 +116,11 @@ function dobFlags(d, flags) {
   else if (d.total === 0) flags.push({ id: 'dob-clear', level: 'green', source: 'DOB', title: 'No DOB complaints', reason: 'No Department of Buildings complaints in the last 3 years.' })
 }
 
-function evictionFlags(e, flags) {
+function evictionFlags(e, flags, units) {
   if (!e || e.error) return
-  if (e.total >= 6) flags.push({ id: 'evictions', level: 'red', source: 'Marshals', title: 'Many evictions', reason: `${plural(e.total, 'residential eviction')} carried out in the last 5 years.` })
-  else if (e.total >= 2) flags.push({ id: 'evictions', level: 'yellow', source: 'Marshals', title: 'Some evictions', reason: `${plural(e.total, 'residential eviction')} carried out in the last 5 years.` })
+  const reason = `Carried out in the last 5 years: ${withRate(plural(e.total, 'residential eviction'), e.total, units)}.`
+  if (e.total >= 6 && meetsRate(e.total, units, EVERY.evictionsRed)) flags.push({ id: 'evictions', level: 'red', source: 'Marshals', title: 'Many evictions', reason })
+  else if (e.total >= 2 && meetsRate(e.total, units, EVERY.evictionsYellow)) flags.push({ id: 'evictions', level: 'yellow', source: 'Marshals', title: 'Some evictions', reason })
   else if (e.total === 0) flags.push({ id: 'evictions', level: 'green', source: 'Marshals', title: 'No evictions', reason: 'No residential evictions carried out in the last 5 years.' })
 }
 
@@ -151,13 +185,14 @@ const ORDER = { red: 0, yellow: 1, green: 2 }
 
 export function scoreRecord(record) {
   const flags = []
+  const units = unitsFor(record)
   // The city's own lists go first: the sort below is stable, so they lead their tier.
   aepFlags(record.aep, flags)
   vacateFlags(record.vacateOrders, flags)
-  violationFlags(record.violations, flags)
-  complaintFlags(record.complaints311, flags)
+  violationFlags(record.violations, flags, units)
+  complaintFlags(record.complaints311, flags, units)
   dobFlags(record.dob, flags)
-  evictionFlags(record.evictions, flags)
+  evictionFlags(record.evictions, flags, units)
   litigationFlags(record.litigations, flags)
   bedbugFlags(record.bedbugs, flags)
   flags.sort((a, b) => ORDER[a.level] - ORDER[b.level])
@@ -169,7 +204,15 @@ export function scoreRecord(record) {
   if (counts.red >= 2 || counts.yellow >= 4) mood = 'worried'
   else if (counts.red >= 1 || counts.yellow >= 2) mood = 'mixed'
 
-  return { flags, counts, mood }
+  return { flags, counts, mood, units }
+}
+
+// One line for the explainer saying which way this building was scored.
+export function scoringBasis(record) {
+  const units = unitsFor(record)
+  if (units) return `For this building, the rates use ${plural(units, 'apartment')} from PLUTO.`
+  if (record?.building?.error) return 'For this building, the apartment count (PLUTO) didn’t load, so only the plain counts were used.'
+  return 'For this building, PLUTO has no apartment count, so only the plain counts were used.'
 }
 
 export const MOOD_COPY = {

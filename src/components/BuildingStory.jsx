@@ -45,7 +45,7 @@ export default function BuildingStory({ summary }) {
         <span className="pop-sm grid h-11 w-11 shrink-0 place-items-center bg-bubblegum">
           <BookOpen aria-hidden size={22} strokeWidth={2.5} />
         </span>
-        <div>
+        <div className="min-w-0">
           <h2 id="story-heading" className="text-xl font-extrabold sm:text-2xl">This building’s story</h2>
           <p className="text-sm text-ink/60">
             {story.status === 'fallback' ? 'A quick summary of the record below' : 'Written by AI from only the public records on this page'}
@@ -72,7 +72,7 @@ export default function BuildingStory({ summary }) {
           <div className="space-y-3 text-lg leading-relaxed">
             {paragraphs.map((p, i) =>
               /not advice\.?$/i.test(p) && i === paragraphs.length - 1 && paragraphs.length > 1 ? (
-                <p key={i} className="story-p inline-block rounded-full border-2 border-ink bg-lilac px-4 py-1 text-sm font-bold">{p}</p>
+                <p key={i} className="story-p inline-block rounded-[1.1rem] border-2 border-ink bg-lilac px-4 py-1 text-sm font-bold">{p}</p>
               ) : (
                 <p key={i} className="story-p">{p}</p>
               ),

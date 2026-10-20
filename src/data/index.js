@@ -10,10 +10,13 @@ import { fetchLitigations } from './litigations.js'
 import { fetchVacateOrders } from './vacateOrders.js'
 import { fetchOwnership } from './ownership.js'
 import { fetchLastSale } from './sales.js'
+import { fetchBuildingFacts } from './pluto.js'
+import { fetch311History, fetchViolationHistory } from './history.js'
 
 export { suggestAddresses, geocodeAddress }
 export { fetchStory, askBuilding } from './ai.js'
 export { DATASETS, LOOKBACK_YEARS } from './config.js'
+export { BENCHMARKS, benchmarksMeta } from './benchmarks.js'
 
 export class AddressNotFoundError extends Error {
   constructor(query) {
@@ -43,6 +46,10 @@ export async function getBuildingRecord(input, opts = {}) {
     vacateOrders: fetchVacateOrders,
     ownership: fetchOwnership,
     lastSale: fetchLastSale,
+    // Phase 4 "Smarts"
+    building: fetchBuildingFacts,
+    violationHistory: fetchViolationHistory,
+    complaintHistory: fetch311History,
   }
 
   const keys = Object.keys(sources)

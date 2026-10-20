@@ -21,7 +21,7 @@ function Section({ icon: Icon, title, subtitle, accent, data, isEmpty, emptyText
         <span className={`pop-sm grid h-11 w-11 shrink-0 place-items-center ${accent}`}>
           <Icon aria-hidden size={22} strokeWidth={2.5} />
         </span>
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-extrabold sm:text-2xl">{title}</h2>
           <p className="text-sm text-ink/60">{subtitle}</p>
         </div>
@@ -56,9 +56,9 @@ export function ViolationsSection({ data }) {
         <>
           <div className="flex flex-wrap gap-2">
             {['C', 'B', 'A'].map((c) => (
-              <span key={c} className={`pop-sm px-3 py-1.5 text-sm font-bold ${CLASS_INFO[c].cls}`}>
-                {data.openByClass[c]} open {CLASS_INFO[c].label}
-                <span className="font-medium opacity-75"> · {CLASS_INFO[c].note}</span>
+              <span key={c} className={`pop-sm inline-flex flex-wrap gap-x-1 px-3 py-1.5 text-sm font-bold ${CLASS_INFO[c].cls}`}>
+                <span className="whitespace-nowrap">{data.openByClass[c]} open {CLASS_INFO[c].label}</span>
+                <span className="whitespace-nowrap font-medium opacity-75">· {CLASS_INFO[c].note}</span>
               </span>
             ))}
           </div>
@@ -71,10 +71,10 @@ export function ViolationsSection({ data }) {
                 <span className={`mt-0.5 h-fit shrink-0 rounded-lg border-2 border-ink px-1.5 text-xs font-extrabold ${CLASS_INFO[v.class]?.cls || 'bg-lilac'}`}>
                   {v.class}
                 </span>
-                <div>
-                  <p className="font-medium">
-                    {v.text}
-                    {v.count > 1 && <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-xs font-bold text-cream">×{v.count}</span>}
+                <div className="min-w-0">
+                  <p className="badge-row font-medium">
+                    <span>{v.text}</span>
+                    {v.count > 1 && <span className="pill bg-ink px-2 py-0.5 text-xs font-bold text-cream">×{v.count}</span>}
                   </p>
                   <p className="text-sm text-ink/55">
                     {v.count > 1 ? `Latest ${formatDate(v.date)}` : formatDate(v.date)}
@@ -86,7 +86,7 @@ export function ViolationsSection({ data }) {
             ))}
           </ul>
           {items.length > 5 && (
-            <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-2 text-sm font-bold underline decoration-2 underline-offset-4">
+            <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-1 min-h-10 text-sm font-bold underline decoration-2 underline-offset-4">
               {showAll ? 'Show fewer' : `Show more (${Math.min(items.length, 20) - 5} more)`}
             </button>
           )}
@@ -119,8 +119,8 @@ export function ComplaintsSection({ data }) {
               {housing.slice(0, 7).map((t) => (
                 <li key={t.type}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-medium">{plainComplaintType(t.type)}</span>
-                    <span className="font-display text-lg font-extrabold">{t.count}</span>
+                    <span className="min-w-0 font-medium">{plainComplaintType(t.type)}</span>
+                    <span className="shrink-0 font-display text-lg font-extrabold">{t.count}</span>
                   </div>
                   <div className="mt-1 h-3 overflow-hidden rounded-full border-2 border-ink bg-ink/5">
                     <div className="bar h-full rounded-full bg-sky" style={{ width: `${Math.max(6, (t.count / max) * 100)}%` }} />
@@ -163,11 +163,11 @@ export function DobSection({ data }) {
           <ul className="mt-2 divide-y-2 divide-dashed divide-ink/15">
             {items.slice(0, 6).map((c) => (
               <li key={c.id} className="flex items-start justify-between gap-3 py-3">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium">{c.label}</p>
                   <p className="text-sm text-ink/55">{formatDate(c.date)}</p>
                 </div>
-                <span className={`shrink-0 rounded-full border-2 border-ink px-2.5 py-0.5 text-xs font-bold ${c.status === 'Active' ? 'bg-sunny' : 'bg-ink/5'}`}>
+                <span className={`pill border-2 border-ink px-2.5 py-0.5 text-xs font-bold ${c.status === 'Active' ? 'bg-sunny' : 'bg-ink/5'}`}>
                   {c.status}
                 </span>
               </li>
@@ -198,7 +198,7 @@ export function EvictionsSection({ data }) {
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {years.map(([y, n]) => (
-              <span key={y} className="pop-sm bg-lilac px-3 py-1 text-sm font-bold">{y}: {n}</span>
+              <span key={y} className="pop-sm whitespace-nowrap bg-lilac px-3 py-1 text-sm font-bold">{y}: {n}</span>
             ))}
           </div>
           <p className="mt-3 text-xs text-ink/50">Counts cover the whole building; a large building will naturally have more.</p>

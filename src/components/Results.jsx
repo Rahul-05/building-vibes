@@ -9,8 +9,11 @@ import VibeCard from './VibeCard.jsx'
 import BuildingStory from './BuildingStory.jsx'
 import AskBuilding from './AskBuilding.jsx'
 import DeeperRecord from './DeeperRecord.jsx'
+import { TrendAndFixes } from './Context.jsx'
 import { ComplaintsSection, DobSection, EvictionsSection, ViolationsSection } from './RecordSections.jsx'
-import { MOOD_COPY, scoreRecord } from '../lib/scoring.js'
+import { Check, GitCompareArrows } from 'lucide-react'
+import { MOOD_COPY, scoreRecord, scoringBasis } from '../lib/scoring.js'
+import { computeInsights } from '../lib/insights.js'
 import { questionsFor } from '../lib/questions.js'
 import { buildSummary } from '../lib/summary.js'
 import { formatDate } from '../lib/plainLanguage.js'
@@ -26,13 +29,18 @@ const SOURCE_NAMES = {
   vacateOrders: 'vacate orders',
   litigations: 'HPD court cases',
   bedbugs: 'bedbug filings',
+  building: 'the apartment count (PLUTO)',
+  violationHistory: 'HPD violation history',
+  complaintHistory: '311 history',
 }
 
-export default function Results({ record }) {
+// compare: { pinned, full, onToggle } from App's compare tray (optional).
+export default function Results({ record, compare }) {
   const scored = useMemo(() => scoreRecord(record), [record])
   const { flags, counts, mood } = scored
-  const questions = useMemo(() => questionsFor(flags, record), [flags, record])
-  const summary = useMemo(() => buildSummary(record, scored), [record, scored])
+  const insights = useMemo(() => computeInsights(record), [record])
+  const questions = useMemo(() => questionsFor(flags, record, undefined, insights), [flags, record, insights])
+  const summary = useMemo(() => buildSummary(record, scored, insights), [record, scored, insights])
   const root = useRef(null)
   // Mascot arrives "searching", then settles into its computed mood.
   const [shownMood, setShownMood] = useState('searching')
@@ -72,13 +80,30 @@ export default function Results({ record }) {
           <div className="min-w-0">
             <p className="text-sm font-bold uppercase tracking-widest opacity-70">{place.borough}</p>
             <h1 className="mt-1 break-words text-3xl font-extrabold leading-tight sm:text-4xl">{place.name}</h1>
-            <p className="mt-3 font-display text-2xl font-bold">{MOOD_COPY[mood].label}</p>
+            {insights.factsLine && <p className="mt-1 font-bold text-ink/75">{insights.factsLine}</p>}
+            <p className="mt-3 font-display text-2xl font-bold leading-tight">{MOOD_COPY[mood].label}</p>
             <p className="mt-1 text-ink/80">{MOOD_COPY[mood].blurb}</p>
-            <Disclaimer className="mt-4" />
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <Disclaimer />
+              {compare && (
+                <button
+                  type="button"
+                  onClick={() => compare.onToggle(record)}
+                  disabled={!compare.pinned && compare.full}
+                  aria-pressed={compare.pinned}
+                  className="pop-sm press inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap bg-paper px-3 py-1.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {compare.pinned ? <Check aria-hidden size={16} strokeWidth={3} /> : <GitCompareArrows aria-hidden size={16} strokeWidth={2.5} />}
+                  {compare.pinned ? 'Pinned to compare' : compare.full ? 'Compare tray is full (3)' : 'Compare this building'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
-        <p className="relative mt-4 text-center text-xs text-ink/60 sm:text-right">
-          BBL {place.bbl}{place.bin && ` · BIN ${place.bin}`} · checked {formatDate(record.fetchedAt)}
+        <p className="relative mt-4 flex flex-wrap justify-center gap-x-2 text-xs text-ink/60 sm:justify-end">
+          <span className="whitespace-nowrap">BBL {place.bbl}</span>
+          {place.bin && <span className="whitespace-nowrap">· BIN {place.bin}</span>}
+          <span className="whitespace-nowrap">· checked {formatDate(record.fetchedAt)}</span>
         </p>
       </section>
 
@@ -89,7 +114,8 @@ export default function Results({ record }) {
       )}
 
       <BuildingStory summary={summary} />
-      <FlagSummary flags={flags} counts={counts} />
+      <FlagSummary flags={flags} counts={counts} benchmark={insights.benchmark} basis={scoringBasis(record)} />
+      <TrendAndFixes trend={insights.trend} fixRate={insights.fixRate} />
       <ViolationsSection data={record.violations} />
       <ComplaintsSection data={record.complaints311} />
       <DobSection data={record.dob} />
@@ -102,7 +128,7 @@ export default function Results({ record }) {
       <div className="reveal text-center">
         <Disclaimer />
         <p className="mt-3 text-sm text-ink/60">
-          Sources: NYC Open Data (HPD violations, registrations, court cases, vacate orders and AEP; bedbug filings; 311; DOB; NYC Marshals; ACRIS property records) and NYC GeoSearch. Records can lag or contain errors.
+          Sources: NYC Open Data (HPD violations, registrations, court cases, vacate orders and AEP; bedbug filings; 311; DOB; NYC Marshals; ACRIS property records; PLUTO tax lot data) and NYC GeoSearch. Records can lag or contain errors.
         </p>
       </div>
     </div>

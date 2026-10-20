@@ -10,7 +10,7 @@ export default function VibeCard({ place, mood, counts }) {
   return (
     <section aria-labelledby="vibecard-heading" className="reveal">
       <h2 id="vibecard-heading" className="mb-3 text-2xl font-extrabold sm:text-3xl">Your vibe card</h2>
-      <div className={`pop relative mx-auto max-w-sm p-6 ${MOOD_BG[mood]}`}>
+      <div className={`pop relative mx-auto max-w-sm p-5 sm:p-6 ${MOOD_BG[mood]}`}>
         {/* decorative shapes, clipped to the card on their own layer so the mascot never is */}
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[25px]">
           <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full border-[3px] border-ink bg-paper/40" />
@@ -20,9 +20,9 @@ export default function VibeCard({ place, mood, counts }) {
         <p className="relative font-display text-sm font-extrabold uppercase tracking-[0.2em]">Building Vibes</p>
         <div className="relative mt-2 flex items-center gap-3">
           <div className="shrink-0 overflow-visible py-1">
-            <Mascot mood={mood} className="h-28 w-28" />
+            <Mascot mood={mood} className="h-24 w-24 sm:h-28 sm:w-28" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="font-display text-2xl font-extrabold leading-tight">{MOOD_COPY[mood].label}</p>
             <p className="mt-1 text-sm font-medium">{place.name}</p>
             <p className="text-sm opacity-75">{place.borough}</p>

@@ -7,17 +7,35 @@ import AddressSearch from './components/AddressSearch.jsx'
 import LoadingView from './components/LoadingView.jsx'
 import Results from './components/Results.jsx'
 import StateMessage from './components/StateMessage.jsx'
+import { CompareTray, CompareView, MAX_PINNED } from './components/Compare.jsx'
 import { AddressNotFoundError, getBuildingRecord } from './data/index.js'
 import { prefersReducedMotion } from './lib/motion.js'
 
 const EXAMPLES = ['1520 Sedgwick Ave, Bronx', '1 Union Sq S, Manhattan', '2 Gold St, Manhattan']
 
 // View state machine: idle → loading → results | notFound | error
+// The compare tray and the comparison sit beside it: pinning survives new searches, and the
+// comparison overlays whatever view is open (kept mounted, so the AI story isn't refetched).
 export default function App() {
   const [view, setView] = useState({ name: 'idle' })
+  const [tray, setTray] = useState([]) // [{ bbl, record }], in app state only, never stored
+  const [comparing, setComparing] = useState(false)
   const requestRef = useRef(null)
 
+  const togglePinned = (record) =>
+    setTray((t) => {
+      const bbl = record.place.bbl
+      if (t.some((x) => x.bbl === bbl)) return t.filter((x) => x.bbl !== bbl)
+      return t.length >= MAX_PINNED ? t : [...t, { bbl, record }]
+    })
+  const unpin = (bbl) => setTray((t) => t.filter((x) => x.bbl !== bbl))
+  const openCompare = () => {
+    setComparing(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   async function search(input) {
+    setComparing(false)
     requestRef.current?.abort()
     const controller = new AbortController()
     requestRef.current = controller
@@ -35,26 +53,32 @@ export default function App() {
   }
 
   const reset = () => {
+    setComparing(false)
     requestRef.current?.abort()
     setView({ name: 'idle' })
   }
 
   return (
-    <div className="relative min-h-dvh">
+    <div className={`relative min-h-dvh ${tray.length && !comparing ? 'pb-56 sm:pb-28' : ''}`}>
       <Backdrop />
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-        <button type="button" onClick={reset} className="pop-sm press flex items-center gap-2 bg-paper px-3 py-1.5 font-display text-lg font-extrabold">
+        <button type="button" onClick={reset} className="pop-sm press flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap bg-paper px-3 py-1.5 font-display text-lg font-extrabold">
           <span aria-hidden className="h-4 w-4 rounded-full border-2 border-ink bg-bubblegum" />
           Building Vibes
         </button>
-        {view.name !== 'idle' && (
-          <button type="button" onClick={reset} className="flex items-center gap-1 text-sm font-bold underline decoration-2 underline-offset-4">
+        {(view.name !== 'idle' || comparing) && (
+          <button type="button" onClick={reset} className="flex min-h-10 items-center gap-1 whitespace-nowrap px-1 text-sm font-bold underline decoration-2 underline-offset-4">
             <ArrowLeft aria-hidden size={16} /> New search
           </button>
         )}
       </header>
 
-      <main>
+      {comparing && (
+        <main>
+          <CompareView tray={tray} onRemove={unpin} onBack={() => setComparing(false)} />
+        </main>
+      )}
+      <main hidden={comparing}>
         {view.name === 'idle' && <Landing onSearch={search} />}
         {view.name === 'loading' && <LoadingView query={view.query} />}
         {view.name === 'results' && (
@@ -63,14 +87,18 @@ export default function App() {
             <div className="relative z-50 mx-auto mb-6 w-full max-w-3xl px-4 sm:px-6">
               <AddressSearch onSearch={search} compact />
             </div>
-            <Results key={view.record.place.bbl + view.record.fetchedAt} record={view.record} />
+            <Results
+              key={view.record.place.bbl + view.record.fetchedAt}
+              record={view.record}
+              compare={{ pinned: tray.some((x) => x.bbl === view.record.place.bbl), full: tray.length >= MAX_PINNED, onToggle: togglePinned }}
+            />
           </>
         )}
         {view.name === 'notFound' && (
           <StateMessage
             mood="mixed"
             title="Hmm, we couldn’t find that one"
-            action={<div className="relative z-50 w-[min(36rem,90vw)]"><AddressSearch onSearch={search} autoFocus /></div>}
+            action={<div className="relative z-50 w-full max-w-xl"><AddressSearch onSearch={search} autoFocus /></div>}
           >
             We couldn’t match “{String(view.query)}” to a NYC building. Try a house number and street, like “350 5th Ave, Manhattan”.
           </StateMessage>
@@ -93,6 +121,7 @@ export default function App() {
       <footer className="px-4 pb-8 text-center text-sm text-ink/60">
         Free & open. No accounts, no tracking, nothing stored. Data from NYC Open Data.
       </footer>
+      {!comparing && <CompareTray tray={tray} onRemove={unpin} onClear={() => setTray([])} onView={openCompare} />}
     </div>
   )
 }
@@ -141,7 +170,7 @@ function Landing({ onSearch }) {
         <div className="fade-up mt-4 flex flex-wrap items-center gap-2 text-sm">
           <span className="flex items-center gap-1 font-bold"><Sparkles aria-hidden size={16} /> Try:</span>
           {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" onClick={() => onSearch(ex)} className="rounded-full border-2 border-ink bg-paper px-3 py-1 font-medium hover:bg-sunny">
+            <button key={ex} type="button" onClick={() => onSearch(ex)} className="min-h-10 whitespace-nowrap rounded-full border-2 border-ink bg-paper px-3 py-1 font-medium hover:bg-sunny">
               {ex}
             </button>
           ))}

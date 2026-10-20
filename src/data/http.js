@@ -20,6 +20,8 @@ async function attempt(url, signal, timeout) {
   } catch (err) {
     // Our own timeout (not a caller abort) is worth one retry.
     if (err.name === 'AbortError' && !signal?.aborted) err.retryable = true
+    // A dropped connection ("Failed to fetch" / "fetch failed") is a TypeError; also worth one retry.
+    if (err.name === 'TypeError' && !signal?.aborted) err.retryable = true
     throw err
   } finally {
     clearTimeout(timer)

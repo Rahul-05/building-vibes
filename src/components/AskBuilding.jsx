@@ -60,7 +60,7 @@ export default function AskBuilding({ summary, mood }) {
         </div>
         <div className="min-w-0 flex-1 space-y-3 pb-2" aria-live="polite">
           {exchange && (
-            <p className="asked-bubble ml-auto w-fit max-w-[90%] rounded-2xl rounded-br-md border-[2.5px] border-ink bg-sunny px-4 py-2 font-medium">
+            <p className="asked-bubble ml-auto w-fit max-w-[90%] rounded-2xl rounded-br-md border-[2.5px] border-ink bg-sunny px-4 py-2 font-medium wrap-anywhere">
               {exchange.q}
             </p>
           )}
@@ -114,7 +114,7 @@ export default function AskBuilding({ summary, mood }) {
             type="button"
             disabled={asking}
             onClick={() => ask(s)}
-            className="rounded-full border-2 border-ink bg-paper px-3 py-1 text-sm font-medium hover:bg-sunny disabled:opacity-50 disabled:hover:bg-paper"
+            className="min-h-10 rounded-full border-2 border-ink bg-paper px-3 py-1 text-sm font-medium hover:bg-sunny disabled:opacity-50 disabled:hover:bg-paper"
           >
             {s}
           </button>
