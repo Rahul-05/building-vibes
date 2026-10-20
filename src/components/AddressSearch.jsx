@@ -4,7 +4,19 @@ import { suggestAddresses } from '../data/index.js'
 
 // One input, debounced GeoSearch suggestions, keyboard friendly.
 // onSearch receives either a resolved place (picked suggestion) or the raw text.
-export default function AddressSearch({ onSearch, compact = false, autoFocus = false, initialValue = '' }) {
+// dropUp opens the suggestions above the input (for the compare tray at the screen's bottom edge);
+// listMaxHeight caps that list to the room actually available.
+export default function AddressSearch({
+  onSearch,
+  compact = false,
+  autoFocus = false,
+  initialValue = '',
+  dropUp = false,
+  listMaxHeight,
+  placeholder = 'Type any NYC address…',
+  submitLabel = 'Check vibes',
+  disabled = false,
+}) {
   const [text, setText] = useState(initialValue)
   const [suggestions, setSuggestions] = useState([])
   const [active, setActive] = useState(-1)
@@ -38,6 +50,7 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
   }, [text])
 
   function choose(place) {
+    if (disabled) return
     skipNext.current = true
     setText(place.label)
     setOpen(false)
@@ -48,7 +61,7 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
     e.preventDefault()
     if (open && active >= 0 && suggestions[active]) return choose(suggestions[active])
     const q = text.trim()
-    if (!q) return
+    if (!q || disabled) return
     setOpen(false)
     onSearch(q)
   }
@@ -79,7 +92,7 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
           inputMode="search"
           autoComplete="off"
           autoFocus={autoFocus}
-          placeholder="Type any NYC address…"
+          placeholder={placeholder}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
@@ -93,10 +106,11 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
         />
         <button
           type="submit"
-          className={`pop-sm press flex shrink-0 items-center gap-2 bg-ink font-display font-bold text-cream hover:bg-bubblegum hover:text-ink ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'whitespace-nowrap px-3.5 py-3 text-base sm:px-6 sm:text-lg'}`}
+          disabled={disabled}
+          className={`pop-sm press flex shrink-0 items-center gap-2 bg-ink font-display font-bold text-cream hover:bg-bubblegum hover:text-ink disabled:opacity-50 ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'whitespace-nowrap px-3.5 py-3 text-base sm:px-6 sm:text-lg'}`}
         >
           <Search aria-hidden size={compact ? 16 : 20} strokeWidth={3} />
-          <span className={compact ? 'sr-only sm:not-sr-only' : ''}>Check vibes</span>
+          <span className={compact ? 'sr-only sm:not-sr-only' : ''}>{submitLabel}</span>
         </button>
       </div>
 
@@ -104,7 +118,8 @@ export default function AddressSearch({ onSearch, compact = false, autoFocus = f
         <ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-2 top-full z-[60] mt-2 max-h-80 overflow-y-auto rounded-2xl border-[2.5px] border-ink bg-paper text-left shadow-pop-sm"
+          style={listMaxHeight ? { maxHeight: listMaxHeight } : undefined}
+          className={`absolute inset-x-2 z-[60] max-h-80 overflow-y-auto overscroll-contain rounded-2xl ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'} border-[2.5px] border-ink bg-paper text-left shadow-pop-sm`}
         >
           {suggestions.map((s, i) => (
             <li

@@ -56,6 +56,10 @@
   .badge-row {
     @apply flex flex-wrap items-center gap-x-2 gap-y-1;
   }
+  /* Text beside a pill may shrink to the row, so one very long word breaks instead of overflowing. */
+  .badge-row > :not(.pill) {
+    @apply min-w-0;
+  }
   .pill {
     @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-full;
   }

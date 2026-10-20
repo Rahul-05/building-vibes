@@ -20,7 +20,9 @@ export default function App() {
   const [view, setView] = useState({ name: 'idle' })
   const [tray, setTray] = useState([]) // [{ bbl, record }], in app state only, never stored
   const [comparing, setComparing] = useState(false)
+  const [adding, setAdding] = useState(null) // compare search: { status: 'loading', label } | { status: 'error', message }
   const requestRef = useRef(null)
+  const addRef = useRef(null)
 
   const togglePinned = (record) =>
     setTray((t) => {
@@ -28,7 +30,40 @@ export default function App() {
       if (t.some((x) => x.bbl === bbl)) return t.filter((x) => x.bbl !== bbl)
       return t.length >= MAX_PINNED ? t : [...t, { bbl, record }]
     })
-  const unpin = (bbl) => setTray((t) => t.filter((x) => x.bbl !== bbl))
+  const unpin = (bbl) => {
+    setTray((t) => t.filter((x) => x.bbl !== bbl))
+    setAdding((a) => (a?.status === 'error' ? null : a))
+  }
+  const clearTray = () => {
+    addRef.current?.abort()
+    setAdding(null)
+    setTray([])
+  }
+
+  // Search from inside the compare tray or comparison: fetch the record and pin it in place,
+  // leaving whatever page is open untouched.
+  async function addToCompare(input) {
+    if (tray.length >= MAX_PINNED) return
+    addRef.current?.abort()
+    const controller = new AbortController()
+    addRef.current = controller
+    const label = typeof input === 'string' ? `“${input}”` : input.label
+    setAdding({ status: 'loading', label })
+    try {
+      const record = await getBuildingRecord(input, { signal: controller.signal })
+      if (controller.signal.aborted) return
+      const bbl = record.place.bbl
+      if (tray.some((x) => x.bbl === bbl)) return setAdding({ status: 'error', message: `${record.place.name} is already in the tray.` })
+      setTray((t) => (t.length >= MAX_PINNED || t.some((x) => x.bbl === bbl) ? t : [...t, { bbl, record }]))
+      setAdding(null)
+    } catch (err) {
+      if (controller.signal.aborted) return
+      setAdding({
+        status: 'error',
+        message: err instanceof AddressNotFoundError ? `We couldn’t match ${label} to a NYC building. Try a house number and street.` : 'The city’s data didn’t load just now. Try again in a moment.',
+      })
+    }
+  }
   const openCompare = () => {
     setComparing(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -59,7 +94,8 @@ export default function App() {
   }
 
   return (
-    <div className={`relative min-h-dvh ${tray.length && !comparing ? 'pb-56 sm:pb-28' : ''}`}>
+    // Bottom padding clears the compare tray (it publishes its height) and the floating Ask button.
+    <div className="relative min-h-dvh" style={{ paddingBottom: `calc(var(--tray-space, 0px) + ${view.name === 'results' && !comparing ? '5.5rem' : '0px'})` }}>
       <Backdrop />
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <button type="button" onClick={reset} className="pop-sm press flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap bg-paper px-3 py-1.5 font-display text-lg font-extrabold">
@@ -75,7 +111,7 @@ export default function App() {
 
       {comparing && (
         <main>
-          <CompareView tray={tray} onRemove={unpin} onBack={() => setComparing(false)} />
+          <CompareView tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onBack={() => setComparing(false)} />
         </main>
       )}
       <main hidden={comparing}>
@@ -121,7 +157,7 @@ export default function App() {
       <footer className="px-4 pb-8 text-center text-sm text-ink/60">
         Free & open. No accounts, no tracking, nothing stored. Data from NYC Open Data.
       </footer>
-      {!comparing && <CompareTray tray={tray} onRemove={unpin} onClear={() => setTray([])} onView={openCompare} />}
+      {!comparing && <CompareTray tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onClear={clearTray} onView={openCompare} />}
     </div>
   )
 }

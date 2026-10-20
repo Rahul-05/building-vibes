@@ -8,6 +8,7 @@ import Questions from './Questions.jsx'
 import VibeCard from './VibeCard.jsx'
 import BuildingStory from './BuildingStory.jsx'
 import AskBuilding from './AskBuilding.jsx'
+import AskFab from './AskFab.jsx'
 import DeeperRecord from './DeeperRecord.jsx'
 import { TrendAndFixes } from './Context.jsx'
 import { ComplaintsSection, DobSection, EvictionsSection, ViolationsSection } from './RecordSections.jsx'
@@ -115,7 +116,6 @@ export default function Results({ record, compare }) {
 
       <BuildingStory summary={summary} />
       <FlagSummary flags={flags} counts={counts} benchmark={insights.benchmark} basis={scoringBasis(record)} />
-      <TrendAndFixes trend={insights.trend} fixRate={insights.fixRate} />
       <ViolationsSection data={record.violations} />
       <ComplaintsSection data={record.complaints311} />
       <DobSection data={record.dob} />
@@ -124,6 +124,8 @@ export default function Results({ record, compare }) {
       <Questions questions={questions} />
       <AskBuilding summary={summary} mood={mood} />
       <VibeCard place={place} mood={mood} counts={counts} />
+      {/* Trend and fix rate close the page: the last substantive thing a reader reaches. */}
+      <TrendAndFixes trend={insights.trend} fixRate={insights.fixRate} />
 
       <div className="reveal text-center">
         <Disclaimer />
@@ -131,6 +133,8 @@ export default function Results({ record, compare }) {
           Sources: NYC Open Data (HPD violations, registrations, court cases, vacate orders and AEP; bedbug filings; 311; DOB; NYC Marshals; ACRIS property records; PLUTO tax lot data) and NYC GeoSearch. Records can lag or contain errors.
         </p>
       </div>
+
+      <AskFab mood={mood} />
     </div>
   )
 }

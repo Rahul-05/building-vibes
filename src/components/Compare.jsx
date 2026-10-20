@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, GitCompareArrows, Minus, X } from 'lucide-react'
 import Mascot from './Mascot.jsx'
+import AddressSearch from './AddressSearch.jsx'
 import Disclaimer from './Disclaimer.jsx'
 import { FlagDot } from './FlagSummary.jsx'
 import { TREND_ICONS } from './Context.jsx'
@@ -13,37 +14,110 @@ import { formatDate, plural } from '../lib/plainLanguage.js'
 
 export const MAX_PINNED = 3
 
-export function CompareTray({ tray, onRemove, onClear, onView }) {
-  if (!tray.length) return null
+// Phones: when the keyboard opens, a bottom fixed bar would sit behind it, so the tray rides on
+// the visual viewport instead. Pinch zoom also shrinks the visual viewport; ignore it then.
+function useVisualViewport() {
+  const [vp, setVp] = useState({ inset: 0, height: 0 })
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const zoomed = Math.abs(vv.scale - 1) > 0.01
+      setVp({ inset: zoomed ? 0 : Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)), height: zoomed ? 0 : vv.height })
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+  return vp
+}
+
+// Search to add a building without leaving the tray or the comparison. Remounted (key) after
+// each add so the box clears; a failed add keeps the typed text.
+function CompareAdd({ count, adding, onAdd, dropUp, listMaxHeight }) {
+  if (count >= MAX_PINNED) return <p className="text-sm font-medium text-ink/70">The tray holds {MAX_PINNED} buildings. Remove one to add another.</p>
+  const loading = adding?.status === 'loading'
   return (
-    <aside aria-label="Compare tray" className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
-      <div className="pop mx-auto flex max-w-3xl flex-col gap-3 bg-paper p-3 sm:flex-row sm:items-center sm:p-4">
-        <ul className="flex min-w-0 flex-1 flex-wrap gap-2">
-          {tray.map(({ bbl, record }) => (
-            <li key={bbl} className="flex min-w-0 max-w-full items-center gap-1 rounded-full border-2 border-ink bg-lilac py-0.5 pl-3 pr-1 text-sm font-bold">
-              <span className="truncate">{record.place.name}</span>
-              {/* 40px tap target; the negative margin keeps the pill itself slim. */}
-              <button type="button" onClick={() => onRemove(bbl)} aria-label={`Remove ${record.place.name} from compare`} className="-my-2 grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-ink/10">
-                <X aria-hidden size={14} strokeWidth={3} />
-              </button>
-            </li>
-          ))}
-          {tray.length < MAX_PINNED && (
-            <li className="self-center text-xs text-ink/60">
-              {tray.length === 1 ? 'Search another address and pin it to compare.' : `Room for ${MAX_PINNED - tray.length} more.`}
-            </li>
-          )}
-        </ul>
-        <div className="flex shrink-0 items-center justify-end gap-2">
-          <button type="button" onClick={onClear} className="min-h-10 px-2 text-sm font-bold underline decoration-2 underline-offset-4">Clear</button>
-          <button
-            type="button"
-            onClick={onView}
-            disabled={tray.length < 2}
-            className="pop-sm press inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap bg-sunny px-4 py-2 font-display font-bold disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <GitCompareArrows aria-hidden size={18} strokeWidth={2.5} /> View comparison
-          </button>
+    <div className="min-w-0">
+      <AddressSearch
+        key={count}
+        onSearch={onAdd}
+        compact
+        dropUp={dropUp}
+        listMaxHeight={listMaxHeight}
+        disabled={loading}
+        placeholder={count === 1 ? 'Add a second building…' : 'Add another building…'}
+        submitLabel="Add"
+      />
+      <p aria-live="polite" className={`px-2 text-sm font-medium empty:hidden ${adding?.status === 'error' ? 'mt-2 text-ink' : 'mt-2 text-ink/70'}`}>
+        {loading && `Looking up ${adding.label}…`}
+        {adding?.status === 'error' && adding.message}
+      </p>
+    </div>
+  )
+}
+
+export function CompareTray({ tray, adding, onAdd, onRemove, onClear, onView }) {
+  const ref = useRef(null)
+  const [height, setHeight] = useState(0)
+  const vp = useVisualViewport()
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setHeight(el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [tray.length > 0])
+
+  // Publish the room the tray takes so the page padding and the floating Ask button clear it.
+  useEffect(() => {
+    if (!tray.length) return
+    const root = document.documentElement
+    root.style.setProperty('--tray-space', `${height + vp.inset}px`)
+    return () => root.style.removeProperty('--tray-space')
+  }, [tray.length, height, vp.inset])
+
+  if (!tray.length) return null
+  // Suggestions open upward from the top of the tray; cap them to the visible room above it.
+  const listMaxHeight = vp.height ? `min(20rem, ${Math.max(120, vp.height - height - 12)}px)` : undefined
+
+  return (
+    <aside
+      ref={ref}
+      aria-label="Compare tray"
+      style={vp.inset ? { bottom: vp.inset } : undefined}
+      className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5"
+    >
+      <div className="pop mx-auto flex max-w-3xl flex-col gap-3 bg-paper p-3 sm:p-4">
+        <CompareAdd count={tray.length} adding={adding} onAdd={onAdd} dropUp listMaxHeight={listMaxHeight} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <ul className="flex min-w-0 flex-1 flex-wrap gap-2">
+            {tray.map(({ bbl, record }) => (
+              <li key={bbl} className="flex min-w-0 max-w-full items-center gap-1 rounded-full border-2 border-ink bg-lilac py-0.5 pl-3 pr-1 text-sm font-bold">
+                <span className="truncate">{record.place.name}</span>
+                {/* 40px tap target; the negative margin keeps the pill itself slim. */}
+                <button type="button" onClick={() => onRemove(bbl)} aria-label={`Remove ${record.place.name} from compare`} className="-my-2 grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-ink/10">
+                  <X aria-hidden size={14} strokeWidth={3} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="flex shrink-0 items-center justify-end gap-2">
+            <button type="button" onClick={onClear} className="min-h-10 px-2 text-sm font-bold underline decoration-2 underline-offset-4">Clear</button>
+            <button
+              type="button"
+              onClick={onView}
+              disabled={tray.length < 2}
+              className="pop-sm press inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap bg-sunny px-4 py-2 font-display font-bold disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <GitCompareArrows aria-hidden size={18} strokeWidth={2.5} /> View comparison
+            </button>
+          </div>
         </div>
       </div>
     </aside>
@@ -189,7 +263,7 @@ function Head({ entry, onRemove }) {
   )
 }
 
-export function CompareView({ tray, onRemove, onBack }) {
+export function CompareView({ tray, adding, onAdd, onRemove, onBack }) {
   const entries = useMemo(
     () => tray.map(({ record }) => ({ record, scored: scoreRecord(record), insights: computeInsights(record) })),
     [tray],
@@ -206,9 +280,13 @@ export function CompareView({ tray, onRemove, onBack }) {
         </button>
       </div>
       <p className="text-ink/75">The same public record facts for each building, in the order you pinned them. No winner here: read the numbers and decide for yourself.</p>
+      {/* Positioned + z-50 so the suggestions list stacks over the table below. */}
+      <div className="relative z-50 max-w-xl">
+        <CompareAdd count={tray.length} adding={adding} onAdd={onAdd} />
+      </div>
 
       {entries.length === 0 ? (
-        <p className="pop bg-paper p-6 font-medium">Nothing pinned yet. Look up a building and press “Compare this building”.</p>
+        <p className="pop bg-paper p-6 font-medium">Nothing pinned yet. Add an address above, or look up a building and press “Compare this building”.</p>
       ) : (
         <>
           {/* Wide screens: one column per building. */}
@@ -254,7 +332,7 @@ export function CompareView({ tray, onRemove, onBack }) {
               </article>
             ))}
           </div>
-          {entries.length === 1 && <p className="text-sm text-ink/70">Only one building is pinned. Search another address and pin it to see them side by side.</p>}
+          {entries.length === 1 && <p className="text-sm text-ink/70">Only one building is pinned. Add another address above to see them side by side.</p>}
         </>
       )}
 

@@ -40,6 +40,23 @@ const FLOAT = { happy: [4, 4], mixed: [3, 4.6], worried: [2.5, 5], searching: [3
 
 const line = { stroke: INK, strokeWidth: STROKE, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }
 
+// Static close up of Vibe's face (no motion), for small spots like the floating Ask button.
+export function MascotFace({ mood = 'happy', className = '' }) {
+  const cfg = MOODS[mood] || MOODS.happy
+  return (
+    <svg aria-hidden viewBox="58 70 84 84" className={`block shrink-0 ${className}`}>
+      <rect x="48" y="44" width="104" height="162" fill={cfg.body} />
+      <path d={cfg.eyeL} {...line} />
+      <path d={cfg.eyeR} {...line} />
+      <g opacity={cfg.brow}>
+        <path d={cfg.browL} {...line} />
+        <path d={cfg.browR} {...line} />
+      </g>
+      <path d={cfg.mouth} {...line} />
+    </svg>
+  )
+}
+
 export default function Mascot({ mood = 'happy', className = '', title }) {
   const root = useRef(null)
   const initial = useRef(MOODS[mood] || MOODS.happy).current

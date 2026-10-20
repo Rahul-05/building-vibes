@@ -49,7 +49,7 @@ export default function AskBuilding({ summary, mood }) {
   }, [exchange, asking])
 
   return (
-    <section ref={root} aria-labelledby="ask-heading" className="pop reveal bg-mint p-5 sm:p-7">
+    <section ref={root} id="ask" aria-labelledby="ask-heading" className="pop reveal scroll-mt-4 bg-mint p-5 sm:p-7">
       <h2 id="ask-heading" className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl">
         <MessageCircle aria-hidden strokeWidth={2.75} /> Ask about this building
       </h2>
