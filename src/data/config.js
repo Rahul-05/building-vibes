@@ -25,5 +25,5 @@ export const REQUEST_TIMEOUT_MS = 20000
 
 // Phase 2 AI helper (Cloudflare Worker in worker/). It holds the Gemini key; the browser never sees it.
 // The deploy step replaces PLACEHOLDER with the account's workers.dev subdomain.
-export const WORKER_URL = 'https://building-vibes-ai.PLACEHOLDER.workers.dev'
+export const WORKER_URL = 'https://building-vibes-ai.rao-gannamaneni123.workers.dev'
 export const AI_TIMEOUT_MS = 20000
