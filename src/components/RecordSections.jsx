@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AlertTriangle, Building2, Gavel, Phone, Wrench } from 'lucide-react'
-import { formatDate, isHousingComplaint, plainComplaintType, plainViolation, plural } from '../lib/plainLanguage.js'
+import { formatDate, groupViolations, isHousingComplaint, plainComplaintType, plural } from '../lib/plainLanguage.js'
 
 // Shared shell for each data section, with built-in unavailable/empty states.
 function Section({ icon: Icon, title, subtitle, accent, data, isEmpty, emptyText, children }) {
@@ -35,21 +35,6 @@ const CLASS_INFO = {
   C: { label: 'Class C', note: 'immediately hazardous', cls: 'bg-tomato' },
   B: { label: 'Class B', note: 'hazardous', cls: 'bg-tangerine' },
   A: { label: 'Class A', note: 'non-hazardous', cls: 'bg-sunny' },
-}
-
-// Same violation written up in several apartments → one row with a count.
-// Input is already ordered most-severe/newest first, so first occurrence wins.
-function groupViolations(items) {
-  const groups = new Map()
-  for (const v of items) {
-    const text = plainViolation(v.description)
-    const key = `${v.class}|${text}`
-    if (!groups.has(key)) groups.set(key, { ...v, text, count: 0, units: new Set() })
-    const g = groups.get(key)
-    g.count++
-    if (v.apartment) g.units.add(v.apartment)
-  }
-  return [...groups.values()]
 }
 
 export function ViolationsSection({ data }) {

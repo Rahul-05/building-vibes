@@ -68,6 +68,21 @@ export function plainViolation(raw, maxLength = 150) {
   return text
 }
 
+// Same violation written up in several apartments → one row with a count.
+// Input is already ordered most-severe/newest first, so first occurrence wins.
+export function groupViolations(items) {
+  const groups = new Map()
+  for (const v of items) {
+    const text = plainViolation(v.description)
+    const key = `${v.class}|${text}`
+    if (!groups.has(key)) groups.set(key, { ...v, text, count: 0, units: new Set() })
+    const g = groups.get(key)
+    g.count++
+    if (v.apartment) g.units.add(v.apartment)
+  }
+  return [...groups.values()]
+}
+
 // 311 complaint types → friendlier labels. Unknown types just get sentence-cased.
 const COMPLAINT_LABELS = {
   'HEAT/HOT WATER': 'Heat or hot water',

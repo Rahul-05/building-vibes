@@ -82,7 +82,68 @@ See `RULES` in `src/lib/scoring.js`. They're shown verbatim in the app. In summa
 - Residential evictions in 5 yrs: 6+ red, 2–5 yellow, 0 green.
 - Mascot mood: 2+ red or 4+ yellow → worried. 1 red or 2–3 yellow → mixed. Otherwise happy.
 
-## Phase 2 notes
+## Phase 2: AI building story + Q&A
+
+Two additions to the results page:
+- **This building's story**: 2–3 short, plain paragraphs about the record, ending with "This is public-record information, not advice." While it loads, the section shows a bubbly loading state. If the AI helper is slow (20s timeout), down, or not configured, it quietly shows a template sentence instead (`templateStory` in `src/lib/summary.js`).
+- **Ask about this building**: a text box plus three suggested questions. The mascot answers in a speech bubble. Answers use only the record on the page, and when the record doesn't cover something it says "The public record I have doesn't mention that."
+
+### Architecture
+
+```
+browser (GitHub Pages)                    Cloudflare Worker                 Gemini API
+  record from NYC Open Data  ──►  POST /story { address, summary }  ──►  gemini-2.5-flash
+  buildSummary() (~3 KB)          POST /ask   { address, summary,        (key stays in the
+                                               question }                 Worker as a secret)
+```
+
+- The browser still fetches all NYC data itself. The Worker **never** calls NYC APIs. It only gets the compact summary from `src/lib/summary.js`: flag counts and reasons, open/total HPD violations with the top plain-language issues, 311 complaint themes, DOB counts, and eviction counts. No user data.
+- The Gemini API key lives only in the Worker as a secret. It is not in the frontend, the repo, or `wrangler.toml`.
+- The system instruction keeps the model to the summary, to flag language, and away from verdicts or advice. As a backstop, the Worker rejects any output containing "avoid", "walk away", "don't rent", "safe", "unsafe", or "good/bad building" (quoted official record names are exempt). The frontend then shows its fallback.
+- Worker guards: POST only (405), CORS for `https://rahul-05.github.io` and `http://localhost:5173` only (other origins get 403), body up to 16 KB (413), missing fields (400), questions up to 300 characters, any upstream failure → 502 JSON. Payloads and model output are never logged.
+
+| Path | What it is |
+|---|---|
+| `worker/src/index.js` | The Worker: `/story`, `/ask`, CORS, guards, Gemini call. |
+| `worker/wrangler.toml` | Worker config (`building-vibes-ai`). No secrets. |
+| `src/lib/summary.js` | `buildSummary(record, scored)` → compact summary; `templateStory()` fallback. |
+| `src/data/ai.js` | `fetchStory(summary)`, `askBuilding(summary, question)`. 20s timeout, throws on non-200. |
+| `src/components/BuildingStory.jsx`, `AskBuilding.jsx` | The two new results sections. |
+
+### Deploy the Worker
+
+```bash
+cd worker
+npx wrangler login                        # once
+npx wrangler secret put GEMINI_API_KEY    # paste a key from https://aistudio.google.com/apikey
+npx wrangler deploy                       # prints https://building-vibes-ai.<subdomain>.workers.dev
+npx wrangler deploy --dry-run             # validate without deploying (no login needed)
+```
+
+Then set `WORKER_URL` in `src/data/config.js`. Replace `PLACEHOLDER` in this line with your workers.dev subdomain, then rebuild and redeploy the site:
+
+```js
+export const WORKER_URL = 'https://building-vibes-ai.PLACEHOLDER.workers.dev'
+```
+
+While the URL still contains `PLACEHOLDER`, the frontend skips the network call and uses the template fallbacks, so the site works before the Worker exists.
+
+Smoke test (the Worker requires an allowed `Origin`):
+
+```bash
+curl -s https://building-vibes-ai.<subdomain>.workers.dev/ask \
+  -H 'Origin: http://localhost:5173' -H 'Content-Type: application/json' \
+  -d '{"address":"1520 Sedgwick Ave, Bronx","summary":{"flagCounts":{"red":1,"yellow":0,"green":2}},"question":"Anything recent?"}'
+```
+
+If the site moves off `rahul-05.github.io`, update `ALLOWED_ORIGINS` in `worker/src/index.js`.
+
+### Free-tier notes
+- **Cloudflare Workers free plan:** 100,000 requests/day and 10 ms CPU per request. Time spent waiting on Gemini doesn't count as CPU, so this Worker stays well inside the limit.
+- **Gemini API free tier** (`gemini-2.5-flash`): Google applies per-minute and per-day rate limits per project, and they change over time (check https://ai.google.dev/gemini-api/docs/rate-limits). When the limit is hit, Gemini returns 429, the Worker returns 502, and the page falls back quietly. Thinking is turned off (`thinkingBudget: 0`) and outputs are short, which keeps token use low. Note that free-tier prompts may be used by Google to improve its products. The summary contains only public records.
+- One story request per results view, plus one request per question asked.
+
+## Phase 2 notes (backlog)
 - **Normalize by building size.** Thresholds are absolute counts right now, so a 300-unit building looks worse than a 6-unit one with the same per-unit record. Pull unit counts from PLUTO (`64uk-42ks`, `unitsres`) or HPD Buildings and score per unit.
 - **Shareable vibe card:** export to PNG (e.g. `html-to-image`) and add `?bbl=` deep links so a result can be shared without any server.
 - **DOB category labels:** add the post-2021 codes once DOB publishes an updated list. Consider merging DOB ECB/OATH violations.

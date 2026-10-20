@@ -6,6 +6,7 @@ import { fetchDobComplaints } from './dob.js'
 import { fetchEvictions } from './evictions.js'
 
 export { suggestAddresses, geocodeAddress }
+export { fetchStory, askBuilding } from './ai.js'
 export { DATASETS, LOOKBACK_YEARS } from './config.js'
 
 export class AddressNotFoundError extends Error {

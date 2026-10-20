@@ -1,0 +1,6 @@
+name = "building-vibes-ai"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# GEMINI_API_KEY is a secret, never a [vars] entry. Set it with:
+#   npx wrangler secret put GEMINI_API_KEY

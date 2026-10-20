@@ -6,9 +6,12 @@ import Disclaimer from './Disclaimer.jsx'
 import FlagSummary from './FlagSummary.jsx'
 import Questions from './Questions.jsx'
 import VibeCard from './VibeCard.jsx'
+import BuildingStory from './BuildingStory.jsx'
+import AskBuilding from './AskBuilding.jsx'
 import { ComplaintsSection, DobSection, EvictionsSection, ViolationsSection } from './RecordSections.jsx'
 import { MOOD_COPY, scoreRecord } from '../lib/scoring.js'
 import { questionsFor } from '../lib/questions.js'
+import { buildSummary } from '../lib/summary.js'
 import { formatDate } from '../lib/plainLanguage.js'
 import { prefersReducedMotion } from '../lib/motion.js'
 
@@ -16,8 +19,10 @@ const HERO_BG = { happy: 'bg-mint', mixed: 'bg-sunny', worried: 'bg-tangerine' }
 const SOURCE_NAMES = { violations: 'HPD violations', complaints311: '311 complaints', dob: 'DOB complaints', evictions: 'evictions' }
 
 export default function Results({ record }) {
-  const { flags, counts, mood } = useMemo(() => scoreRecord(record), [record])
+  const scored = useMemo(() => scoreRecord(record), [record])
+  const { flags, counts, mood } = scored
   const questions = useMemo(() => questionsFor(flags), [flags])
+  const summary = useMemo(() => buildSummary(record, scored), [record, scored])
   const root = useRef(null)
   // Mascot arrives "searching", then settles into its computed mood.
   const [shownMood, setShownMood] = useState('searching')
@@ -68,12 +73,14 @@ export default function Results({ record }) {
         </p>
       )}
 
+      <BuildingStory summary={summary} />
       <FlagSummary flags={flags} counts={counts} />
       <ViolationsSection data={record.violations} />
       <ComplaintsSection data={record.complaints311} />
       <DobSection data={record.dob} />
       <EvictionsSection data={record.evictions} />
       <Questions questions={questions} />
+      <AskBuilding summary={summary} mood={mood} />
       <VibeCard place={place} mood={mood} counts={counts} />
 
       <div className="reveal text-center">
