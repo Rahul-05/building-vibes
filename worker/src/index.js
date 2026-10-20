@@ -3,8 +3,9 @@
 // Holds the Gemini key (env.GEMINI_API_KEY secret). Never calls NYC APIs, never logs payloads.
 
 // In preference order. The first two race in parallel; the rest are tried one at a time if both
-// lose. 404 (model retired for this account), 429 (quota), 503 (overloaded), a timeout, or an
-// empty/verdict-failing answer moves on to the next model; any other HTTP error stops everything.
+// lose. 400 (model specific incompatibility), 404 (model retired for this account), 429 (quota),
+// 503 (overloaded), a timeout, or an empty/verdict-failing answer moves on to the next model;
+// any other HTTP error (401/403: a bad key fails everywhere) stops everything.
 const GEMINI_MODELS = [
   'gemini-3.5-flash',
   'gemini-flash-latest',
@@ -13,7 +14,9 @@ const GEMINI_MODELS = [
   'gemini-flash-lite-latest',
   'gemini-3.8-flash',
 ]
-const RETRYABLE_STATUS = new Set([404, 429, 503])
+const RETRYABLE_STATUS = new Set([400, 404, 429, 503])
+// The lite models reject generationConfig.thinkingConfig with a 400, so only these get it.
+const THINKING_MODELS = new Set(['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.8-flash'])
 const ATTEMPT_TIMEOUT_MS = 20000
 const geminiUrl = (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
@@ -21,20 +24,21 @@ const ALLOWED_ORIGINS = new Set(['https://rahul-05.github.io', 'http://localhost
 
 const MAX_BODY_BYTES = 16 * 1024
 const MAX_QUESTION_CHARS = 300
-const STORY_FOOTER = 'This is public-record information, not advice.'
+const STORY_FOOTER = 'This is public record information, not advice.'
 
 const BASE_RULES = `You are "Vibe", the friendly building mascot of Building Vibes, a free tool that explains NYC buildings' public records to renters.
 
 Hard rules:
-- Use ONLY facts in the provided public-record summary. Never invent, guess, or add outside knowledge about the building, the landlord, or the neighborhood.
+- Use ONLY facts in the provided public record summary. Never invent, guess, or add outside knowledge about the building, the landlord, or the neighborhood.
 - Describe the record with flag language (green, yellow, or red flags) and plain counts. The record speaks; you don't judge.
 - NEVER give verdicts or advice. Never tell anyone to rent or not rent, and never call the building or anything in it safe or unsafe, good or bad. Do not use these words or phrases at all, even to say you can't use them: "avoid", "walk away", "don't rent", "safe", "unsafe", "good building", "bad building". The only exception: if an official record name in the summary contains one of those words (e.g. a DOB category like "Façade – Unsafe Notification"), you may quote that name exactly, inside double quotes.
 - Large buildings naturally have more records; don't treat raw counts as a ranking.
-- Plain, warm, everyday English. Short sentences. Plain text only: no markdown, no bullet points, no headings, no emoji.`
+- Plain, warm, everyday English. Short sentences. Plain text only: no markdown, no bullet points, no headings, no emoji.
+- Do not use hyphens, em dashes or en dashes anywhere in your answer. Do not write hyphenated compounds. Rephrase instead: write 'public record' not 'public-record', 'every day' style splits where natural, and use commas or separate sentences where a dash would go.`
 
 const STORY_INSTRUCTION = `${BASE_RULES}
 
-Task: write "This building's story": 2 or 3 short paragraphs (2-3 sentences each), separated by a blank line. Cover what shows up most in the record, what is open or recent, and anything notably absent (green flags). Then end with exactly this final line on its own: "${STORY_FOOTER}"`
+Task: write "This building's story": 2 or 3 short paragraphs (2 or 3 sentences each), separated by a blank line. Cover what shows up most in the record, what is open or recent, and anything notably absent (green flags). Then end with exactly this final line on its own: "${STORY_FOOTER}"`
 
 const ASK_INSTRUCTION = `${BASE_RULES}
 
@@ -61,29 +65,30 @@ function json(data, status, origin) {
 const isText = (v) => typeof v === 'string' && v.trim().length > 0
 
 function promptFor(route, { address, summary, question }) {
-  const record = `Building address: ${address.trim()}\n\nPublic-record summary (JSON):\n${JSON.stringify(summary)}`
+  const record = `Building address: ${address.trim()}\n\nPublic record summary (JSON):\n${JSON.stringify(summary)}`
   return route === '/story'
     ? `${record}\n\nWrite this building's story.`
     : `${record}\n\nRenter's question: ${question.trim()}`
 }
 
 async function generate(env, systemText, userText, maxOutputTokens) {
-  const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: systemText }] },
-    contents: [{ role: 'user', parts: [{ text: userText }] }],
-    generationConfig: {
-      temperature: 0.4,
-      maxOutputTokens,
-      // Short grounded rewrites don't need thinking; this keeps latency and quota low.
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-  })
+  const bodyFor = (model) =>
+    JSON.stringify({
+      systemInstruction: { parts: [{ text: systemText }] },
+      contents: [{ role: 'user', parts: [{ text: userText }] }],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens,
+        // Short grounded rewrites don't need thinking; this keeps latency and quota low.
+        ...(THINKING_MODELS.has(model) && { thinkingConfig: { thinkingBudget: 0 } }),
+      },
+    })
 
   // `stop` aborts every in-flight attempt: once we have a winner, or after a non-retryable error.
   const stop = new AbortController()
   const failures = []
   const run = (model) =>
-    attempt(env, model, body, stop.signal).catch((err) => {
+    attempt(env, model, bodyFor(model), stop.signal).catch((err) => {
       failures.push(err.message)
       if (err.fatal) stop.abort()
       throw err

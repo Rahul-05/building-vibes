@@ -132,7 +132,7 @@ function Landing({ onSearch }) {
           ))}
         </h1>
         <p className="fade-up mt-5 max-w-lg text-lg text-ink/80 sm:text-xl">
-          Type any NYC address. We pull the building’s public record — violations, 311 calls, building complaints, evictions — and turn it into plain-language flags.
+          Type any NYC address. We pull the building’s public record (violations, 311 calls, building complaints, evictions) and turn it into flags in plain language.
         </p>
         {/* fade-up leaves a transform (own stacking context), so lift this one above its siblings. */}
         <div className="fade-up relative z-50 mt-7">

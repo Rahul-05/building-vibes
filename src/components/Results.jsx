@@ -8,6 +8,7 @@ import Questions from './Questions.jsx'
 import VibeCard from './VibeCard.jsx'
 import BuildingStory from './BuildingStory.jsx'
 import AskBuilding from './AskBuilding.jsx'
+import DeeperRecord from './DeeperRecord.jsx'
 import { ComplaintsSection, DobSection, EvictionsSection, ViolationsSection } from './RecordSections.jsx'
 import { MOOD_COPY, scoreRecord } from '../lib/scoring.js'
 import { questionsFor } from '../lib/questions.js'
@@ -16,12 +17,21 @@ import { formatDate } from '../lib/plainLanguage.js'
 import { prefersReducedMotion } from '../lib/motion.js'
 
 const HERO_BG = { happy: 'bg-mint', mixed: 'bg-sunny', worried: 'bg-tangerine' }
-const SOURCE_NAMES = { violations: 'HPD violations', complaints311: '311 complaints', dob: 'DOB complaints', evictions: 'evictions' }
+const SOURCE_NAMES = {
+  violations: 'HPD violations',
+  complaints311: '311 complaints',
+  dob: 'DOB complaints',
+  evictions: 'evictions',
+  aep: 'the AEP list',
+  vacateOrders: 'vacate orders',
+  litigations: 'HPD court cases',
+  bedbugs: 'bedbug filings',
+}
 
 export default function Results({ record }) {
   const scored = useMemo(() => scoreRecord(record), [record])
   const { flags, counts, mood } = scored
-  const questions = useMemo(() => questionsFor(flags), [flags])
+  const questions = useMemo(() => questionsFor(flags, record), [flags, record])
   const summary = useMemo(() => buildSummary(record, scored), [record, scored])
   const root = useRef(null)
   // Mascot arrives "searching", then settles into its computed mood.
@@ -84,6 +94,7 @@ export default function Results({ record }) {
       <ComplaintsSection data={record.complaints311} />
       <DobSection data={record.dob} />
       <EvictionsSection data={record.evictions} />
+      <DeeperRecord record={record} />
       <Questions questions={questions} />
       <AskBuilding summary={summary} mood={mood} />
       <VibeCard place={place} mood={mood} counts={counts} />
@@ -91,7 +102,7 @@ export default function Results({ record }) {
       <div className="reveal text-center">
         <Disclaimer />
         <p className="mt-3 text-sm text-ink/60">
-          Sources: NYC Open Data (HPD, 311, DOB, NYC Marshals) and NYC GeoSearch. Records can lag or contain errors.
+          Sources: NYC Open Data (HPD violations, registrations, court cases, vacate orders and AEP; bedbug filings; 311; DOB; NYC Marshals; ACRIS property records) and NYC GeoSearch. Records can lag or contain errors.
         </p>
       </div>
     </div>

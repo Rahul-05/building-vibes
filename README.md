@@ -43,6 +43,7 @@ address text ──► NYC GeoSearch ──► BBL + BIN
 | `src/data/http.js` | `fetch` wrapper: timeout, one retry on 429/5xx/timeout, SoQL URL builder. |
 | `src/data/geosearch.js` | Address → place (`bbl`, `bin`, borough/block/lot); autocomplete suggestions. |
 | `src/data/hpd.js`, `complaints311.js`, `dob.js`, `evictions.js` | One module per dataset, each returns a small normalized object. |
+| `src/data/aep.js`, `bedbugs.js`, `litigations.js`, `vacateOrders.js`, `ownership.js`, `sales.js` | Phase 3 "Deeper record" sources, same pattern. |
 | `src/data/dobCategories.js` | DOB complaint category code → description (from DOB's official list). |
 | `src/lib/scoring.js` | Transparent flag rules + mood. The same rule text is shown in the UI under "How we pick flags". |
 | `src/lib/plainLanguage.js` | Strips legal citations from HPD text, sentence-cases it, labels 311 types. |
@@ -73,6 +74,42 @@ Verified against 1520 Sedgwick Ave, Bronx (BBL 2028800017, BIN 2009171), which r
 - The 311 data includes street-level complaints (noise, parking) tied to the BBL. Those are counted separately as "neighborhood" and don't affect flags. Housing complaints are the HPD-routed types (uppercase in the data) plus a short list in `plainLanguage.js`.
 - Pest, mold, and lead keyword checks scan the 60 most severe open violations that we fetch. When a building has more open violations than that, the flag text says so.
 
+## Phase 3: the Deeper record (schemas verified 2026-10-20)
+
+Six more sources, shown in a "Deeper record" area on the results page (building status, court cases, bedbugs, ownership & last sale) and added to the AI summary. Each one is fetched in parallel with the others and can fail on its own.
+
+| Dataset | ID | Join used | Notes |
+|---|---|---|---|
+| Buildings Selected for the Alternative Enforcement Program | `hcir-3275` | `bbl` (numeric column), narrowed by `bin` | `current_status` is `AEP Active` or `AEP Discharged`; `aep_round`, `aep_start_date`, `discharge_date` |
+| Bedbug Reporting | `wz6d-d3jb` | `bbl` (**text** column), narrowed by `bin` | Annual landlord filings. The end-date column really is spelled `filling_period_end_date`. |
+| Housing Litigations | `59kj-x8nc` | `boroid` + `block` + `lot`, narrowed by `bin` | `casestatus` mostly `CLOSED`/`PENDING` (plus a few `GRANTED - <date>`, `Rejected-`, ...); `findingofharassment` is `No Harassment`, `After Inquest`, or `After Trial` |
+| Order to Repair/Vacate Orders | `tb8q-a3ar` | `bbl` (numeric), narrowed by `bin` | `vacate_type` is `Entire Building` or `Partial`; lifted = `actual_rescind_date` on or before today |
+| Multiple Dwelling Registrations | `tesw-yqqr` | `boroid` + `block` + `lot`, then must match `bin` (or be the lot's only building) | Newest `lastregistrationdate` wins |
+| Registration Contacts | `feu5-w2e2` | `registrationid` | Owner = `CorporateOwner`/`IndividualOwner`/`JointOwner`; plus `Agent` and `HeadOfficer`. **Names only**: contact addresses are never selected. |
+| ACRIS Real Property Legals | `8h5j-fqxa` | `borough` + `block` + `lot` → `document_id` | Found via the Socrata catalog API |
+| ACRIS Real Property Master | `bnx9-e6tj` | `document_id in (...)` (batches of 120) + `doc_type` in `DEED`, `DEEDO`, `DEED, RC`, `DEEDP` | Most recent deed's `document_date` + `document_amt`. Also shows the last deed with a non-zero price, since many recent deeds are $0 transfers. |
+
+Live checks, 2026-10-20:
+
+| Source | 1520 Sedgwick Ave, Bronx (2028800017) | 1631 Grand Ave, Bronx (2028660020) |
+|---|---|---|
+| AEP | never listed | **AEP Active**, Round 18, since Jan 31 2025 (1,829 B/C violations at start) |
+| Bedbugs | filing for Nov 2024–Oct 2025: 0 of 102 units infested | filing for Nov 2024–Oct 2025, amended Aug 19 2026: **14 of 42** infested (an earlier filing for the same period said 0) |
+| Litigations | 32 cases all time, 10 opened in last 5 yrs, 1 pending (heat & hot water, May 2026) | 14 all time, 3 in last 5 yrs, 0 pending |
+| Vacate orders | 1 partial (fire damage, 3 units), Nov 2022, rescinded Feb 2024 | none |
+| Owner / agent | WFHA 1520 SEDGWICK LP / M H R MANAGEGEMENT INC (sic) | CAP 1631 Grand Ave Property Owner LLC / CAM Property MGMT |
+| Last deed | Jun 28 2012, $0; last priced: Feb 16 2012, $363,572 (referee's deed) | Jul 26 2022, $0; last priced: Jul 18 2017, $6,990,000 |
+
+The ACRIS join was cross-checked with the Parties dataset (`636b-3b5g`). In both buildings, the grantee on the deed is the same company HPD lists as the current owner.
+
+### Phase 3 quirks
+- **The `bbl` column type differs between datasets** (number in AEP and vacate orders, text in bedbugs and litigations). Each module quotes it to match.
+- **Litigation `bbl`/`bin` are blank on 318 rows**, but `boroid/block/lot` are never blank, so we join on those. In every Phase 3 dataset, rows with a blank `bbl` also have a blank `bin`, so BIN can't fill that gap. BIN is used to pick out this building on lots that hold several (`preferBin` in `http.js`). If no row matches the BIN, the lot's rows are shown and labeled "another building on the same tax lot". Ownership is left out in that case rather than guessed.
+- **Bedbug filings get amended.** The newest `filing_date` wins, even when the reporting period is the same.
+- **HPD registration end dates** in the current extract (e.g. 2026-09-01) can be earlier than today because the dataset updates less often than renewals happen. We show "last filed" and make no claim about whether a registration has expired.
+- **Condo buildings**: ACRIS records deeds against each unit's own lot, not the building's billing lot, so the last-sale line usually doesn't appear for condos.
+- **No portfolio features.** Owner and agent names are shown for this building only and are never used to look up other buildings.
+
 ## Flag rules (Phase 1)
 See `RULES` in `src/lib/scoring.js`. They're shown verbatim in the app. In summary:
 - Open Class C violations: 3+ red, 1–2 yellow, 0 green. Open Class B: 10+ yellow.
@@ -80,6 +117,7 @@ See `RULES` in `src/lib/scoring.js`. They're shown verbatim in the app. In summa
 - Heat/hot-water 311 complaints in 2 yrs: 10+ red, 3–9 yellow, 0 green. Plumbing/leaks 10+ yellow. Elevator 5+ yellow.
 - Active DOB complaints about safety or upkeep: yellow. No DOB complaints in 3 yrs: green.
 - Residential evictions in 5 yrs: 6+ red, 2–5 yellow, 0 green.
+- Phase 3: currently in AEP → red. Vacate order not lifted → red (yellow for both if the record is for another building on the same lot). HPD court cases opened in 5 yrs: 15+ red, 5–14 or any pending yellow, 0 green. Harassment finding in 5 yrs → red. Latest bedbug filing (reporting year ended within 2 yrs): 5+ infested units or 10%+ of units red, 1+ yellow. A missing or zero filing never counts as green.
 - Mascot mood: 2+ red or 4+ yellow → worried. 1 red or 2–3 yellow → mixed. Otherwise happy.
 
 ## Phase 2: AI building story + Q&A
@@ -147,7 +185,7 @@ If the site moves off `rahul-05.github.io`, update `ALLOWED_ORIGINS` in `worker/
 - **Normalize by building size.** Thresholds are absolute counts right now, so a 300-unit building looks worse than a 6-unit one with the same per-unit record. Pull unit counts from PLUTO (`64uk-42ks`, `unitsres`) or HPD Buildings and score per unit.
 - **Shareable vibe card:** export to PNG (e.g. `html-to-image`) and add `?bbl=` deep links so a result can be shared without any server.
 - **DOB category labels:** add the post-2021 codes once DOB publishes an updated list. Consider merging DOB ECB/OATH violations.
-- **More context:** HPD litigation (`59kj-x8nc`), rent stabilization (DHCR), heat-season-only filtering for heat complaints, trend over time ("getting better/worse").
+- **More context:** rent stabilization (DHCR), heat-season-only filtering for heat complaints, trend over time ("getting better/worse").
 - **Accessibility pass** with real assistive-tech testing. Phase 1 has reduced-motion support, labeled controls, and a keyboard-navigable combobox.
 - **Translations** (Spanish, Chinese, etc.) for UI copy and question templates.
 - **Tests:** unit tests for `plainLanguage.js` and `scoring.js`, plus recorded API fixtures for the data layer.

@@ -11,6 +11,15 @@ export const DATASETS = {
   serviceRequests311: 'erm2-nwe9', // 311 Service Requests from 2010 to Present
   dobComplaints: 'eabe-havv', // DOB Complaints Received
   evictions: '6z8x-wfk4', // Evictions (executed by NYC Marshals)
+  // Phase 3 "Deeper record"
+  aep: 'hcir-3275', // Buildings Selected for the Alternative Enforcement Program
+  bedbugs: 'wz6d-d3jb', // Bedbug Reporting (landlord-filed annual reports)
+  litigations: '59kj-x8nc', // HPD Housing Litigations
+  vacateOrders: 'tb8q-a3ar', // HPD Order to Repair/Vacate Orders
+  registrations: 'tesw-yqqr', // HPD Multiple Dwelling Registrations
+  registrationContacts: 'feu5-w2e2', // HPD Registration Contacts
+  acrisLegals: '8h5j-fqxa', // ACRIS Real Property Legals (document → borough/block/lot)
+  acrisMaster: 'bnx9-e6tj', // ACRIS Real Property Master (document type, date, amount)
 }
 
 // How far back we look for "recent" activity, in years.
@@ -19,6 +28,8 @@ export const LOOKBACK_YEARS = {
   complaints311: 2,
   dob: 3,
   evictions: 5,
+  litigations: 5,
+  bedbugs: 2, // a filing whose period ended longer ago than this is shown but not scored
 }
 
 export const REQUEST_TIMEOUT_MS = 20000

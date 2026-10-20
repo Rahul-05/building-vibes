@@ -34,7 +34,7 @@ function Section({ icon: Icon, title, subtitle, accent, data, isEmpty, emptyText
 const CLASS_INFO = {
   C: { label: 'Class C', note: 'immediately hazardous', cls: 'bg-tomato' },
   B: { label: 'Class B', note: 'hazardous', cls: 'bg-tangerine' },
-  A: { label: 'Class A', note: 'non-hazardous', cls: 'bg-sunny' },
+  A: { label: 'Class A', note: 'not hazardous', cls: 'bg-sunny' },
 }
 
 export function ViolationsSection({ data }) {
@@ -201,7 +201,7 @@ export function EvictionsSection({ data }) {
               <span key={y} className="pop-sm bg-lilac px-3 py-1 text-sm font-bold">{y}: {n}</span>
             ))}
           </div>
-          <p className="mt-3 text-xs text-ink/50">Counts are building-wide; a large building will naturally have more.</p>
+          <p className="mt-3 text-xs text-ink/50">Counts cover the whole building; a large building will naturally have more.</p>
         </>
       )}
     </Section>

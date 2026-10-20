@@ -4,6 +4,12 @@ import { fetchHpdViolations } from './hpd.js'
 import { fetch311Complaints } from './complaints311.js'
 import { fetchDobComplaints } from './dob.js'
 import { fetchEvictions } from './evictions.js'
+import { fetchAep } from './aep.js'
+import { fetchBedbugs } from './bedbugs.js'
+import { fetchLitigations } from './litigations.js'
+import { fetchVacateOrders } from './vacateOrders.js'
+import { fetchOwnership } from './ownership.js'
+import { fetchLastSale } from './sales.js'
 
 export { suggestAddresses, geocodeAddress }
 export { fetchStory, askBuilding } from './ai.js'
@@ -30,6 +36,13 @@ export async function getBuildingRecord(input, opts = {}) {
     complaints311: fetch311Complaints,
     dob: fetchDobComplaints,
     evictions: fetchEvictions,
+    // Phase 3 "Deeper record"
+    aep: fetchAep,
+    bedbugs: fetchBedbugs,
+    litigations: fetchLitigations,
+    vacateOrders: fetchVacateOrders,
+    ownership: fetchOwnership,
+    lastSale: fetchLastSale,
   }
 
   const keys = Object.keys(sources)
