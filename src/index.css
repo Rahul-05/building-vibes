@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Bricolage Grotesque", ui-rounded, system-ui, sans-serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+
+  --color-ink: #1d1a3a;
+  --color-cream: #fff6e9;
+  --color-paper: #fffdf8;
+  --color-bubblegum: #ff5ca8;
+  --color-sunny: #ffd23f;
+  --color-tangerine: #ff8a3d;
+  --color-mint: #6ee7b7;
+  --color-leaf: #1fa971;
+  --color-sky: #4d7cfe;
+  --color-grape: #9b6bff;
+  --color-tomato: #ff4d5e;
+  --color-lilac: #e9defe;
+
+  --shadow-pop: 6px 6px 0 0 var(--color-ink);
+  --shadow-pop-sm: 3px 3px 0 0 var(--color-ink);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-cream font-sans text-ink antialiased;
+    min-height: 100dvh;
+  }
+  h1, h2, h3 {
+    @apply font-display;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-sky);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  /* Chunky "sticker" surface used for cards and buttons. */
+  .pop {
+    @apply rounded-[28px] border-[3px] border-ink shadow-pop;
+  }
+  .pop-sm {
+    @apply rounded-2xl border-[2.5px] border-ink shadow-pop-sm;
+  }
+  .press {
+    @apply transition-transform duration-150 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
