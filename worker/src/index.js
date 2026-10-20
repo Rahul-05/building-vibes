@@ -2,10 +2,19 @@
 // fetched into a short "building story" or an answer to one question, via Gemini.
 // Holds the Gemini key (env.GEMINI_API_KEY secret). Never calls NYC APIs, never logs payloads.
 
-// Tried in order. 404 (model retired for this account), 429 (quota) and 503 (overloaded)
-// fall through to the next model; any other failure is final.
-const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.8-flash']
+// In preference order. The first two race in parallel; the rest are tried one at a time if both
+// lose. 404 (model retired for this account), 429 (quota), 503 (overloaded), a timeout, or an
+// empty/verdict-failing answer moves on to the next model; any other HTTP error stops everything.
+const GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-flash-latest',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-3.8-flash',
+]
 const RETRYABLE_STATUS = new Set([404, 429, 503])
+const ATTEMPT_TIMEOUT_MS = 20000
 const geminiUrl = (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
 const ALLOWED_ORIGINS = new Set(['https://rahul-05.github.io', 'http://localhost:5173'])
@@ -70,25 +79,74 @@ async function generate(env, systemText, userText, maxOutputTokens) {
     },
   })
 
-  let res
+  // `stop` aborts every in-flight attempt: once we have a winner, or after a non-retryable error.
+  const stop = new AbortController()
   const failures = []
-  for (const model of GEMINI_MODELS) {
-    res = await fetch(geminiUrl(model), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body,
+  const run = (model) =>
+    attempt(env, model, body, stop.signal).catch((err) => {
+      failures.push(err.message)
+      if (err.fatal) stop.abort()
+      throw err
     })
-    if (res.ok) break
-    failures.push(`${model} ${res.status}`)
-    if (!RETRYABLE_STATUS.has(res.status)) break
-  }
-  if (!res.ok) throw new Error(`Gemini returned ${failures.join(', ')}`)
 
-  const data = await res.json()
-  const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim()
-  if (!text) throw new Error('Gemini returned no text')
-  // Strip stray markdown emphasis/headings; the frontend renders plain text.
-  return text.replace(/\*\*|__|^#+\s*/gm, '').replace(/\n{3,}/g, '\n\n')
+  try {
+    const [first, second, ...rest] = GEMINI_MODELS
+    try {
+      return await Promise.any([run(first), run(second)])
+    } catch {
+      // Both racers lost; fall through to the rest one at a time.
+    }
+    for (const model of rest) {
+      if (stop.signal.aborted) break
+      try {
+        return await run(model)
+      } catch {
+        // Recorded in failures; try the next model.
+      }
+    }
+    throw new Error(`Gemini failed: ${failures.join(', ')}`)
+  } finally {
+    stop.abort()
+  }
+}
+
+// One model, one try, capped at ATTEMPT_TIMEOUT_MS. Resolves with cleaned, verdict-free text or
+// throws; err.fatal marks errors that should stop the whole chain.
+async function attempt(env, model, body, stopSignal) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS)
+  const onStop = () => controller.abort()
+  stopSignal.addEventListener('abort', onStop)
+
+  try {
+    let res, data
+    try {
+      res = await fetch(geminiUrl(model), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+        body,
+        signal: controller.signal,
+      })
+      if (res.ok) data = await res.json()
+    } catch (err) {
+      throw new Error(`${model} ${controller.signal.aborted ? 'aborted' : err.message}`)
+    }
+    if (!res.ok) {
+      const err = new Error(`${model} ${res.status}`)
+      err.fatal = !RETRYABLE_STATUS.has(res.status)
+      throw err
+    }
+
+    const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim()
+    if (!text) throw new Error(`${model} returned no text`)
+    // Strip stray markdown emphasis/headings; the frontend renders plain text.
+    const clean = text.replace(/\*\*|__|^#+\s*/gm, '').replace(/\n{3,}/g, '\n\n')
+    if (hasVerdict(clean)) throw new Error(`${model} failed the verdict check`)
+    return clean
+  } finally {
+    clearTimeout(timer)
+    stopSignal.removeEventListener('abort', onStop)
+  }
 }
 
 async function handle(request, env) {
@@ -137,14 +195,13 @@ async function handle(request, env) {
   if (!env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured')
 
   if (pathname === '/story') {
+    // generate() already rejects verdict language, per model attempt.
     let story = await generate(env, STORY_INSTRUCTION, promptFor(pathname, body), 700)
-    if (hasVerdict(story)) throw new Error('Story failed the verdict check')
     if (!/not advice\.?\s*$/i.test(story)) story = `${story}\n\n${STORY_FOOTER}`
     return json({ story }, 200, origin)
   }
 
   const answer = await generate(env, ASK_INSTRUCTION, promptFor(pathname, body), 350)
-  if (hasVerdict(answer)) throw new Error('Answer failed the verdict check')
   return json({ answer }, 200, origin)
 }
 

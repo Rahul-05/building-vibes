@@ -26,4 +26,7 @@ export const REQUEST_TIMEOUT_MS = 20000
 // Phase 2 AI helper (Cloudflare Worker in worker/). It holds the Gemini key; the browser never sees it.
 // The deploy step replaces PLACEHOLDER with the account's workers.dev subdomain.
 export const WORKER_URL = 'https://building-vibes-ai.rao-gannamaneni123.workers.dev'
-export const AI_TIMEOUT_MS = 20000
+// Generous on purpose: the Worker races and falls back across overloaded Gemini models.
+// The loading states cover the wait; the UI only falls back after this or a non-200.
+export const AI_STORY_TIMEOUT_MS = 75000
+export const AI_ASK_TIMEOUT_MS = 60000
