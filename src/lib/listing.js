@@ -29,3 +29,8 @@ export function looksLikeListing(text) {
   const hits = new Set((t.match(KEYWORD_RE) || []).map((k) => k.toLowerCase().replace(/\s+/g, ' ')))
   return hits.size >= MIN_KEYWORDS
 }
+
+// Does pasted listing text mention a broker fee, or the same kind of charge under another label?
+// Used only to offer the broker fee checker; deterministic, nothing leaves the page.
+const FEE_RE = /\b(broker|brokers|brokerage|commission|fee|fees)\b|\b(processing|listing|access|admin|administrative|marketing|move\s?in|holding)\s+(fee|charge)/i
+export const mentionsFee = (text) => FEE_RE.test(text || '')

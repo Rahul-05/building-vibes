@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { ArrowLeft, ClipboardList, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ClipboardList, ReceiptText, Sparkles } from 'lucide-react'
 import Backdrop from './components/Backdrop.jsx'
 import Mascot from './components/Mascot.jsx'
 import AddressSearch from './components/AddressSearch.jsx'
@@ -8,6 +8,7 @@ import LoadingView from './components/LoadingView.jsx'
 import Results from './components/Results.jsx'
 import StateMessage from './components/StateMessage.jsx'
 import LanguagePicker from './components/LanguagePicker.jsx'
+import FeeCheck from './components/FeeCheck.jsx'
 import { CompareTray, CompareView, MAX_PINNED } from './components/Compare.jsx'
 import { AddressNotFoundError, getBuildingRecord } from './data/index.js'
 import { prefersReducedMotion } from './lib/motion.js'
@@ -23,6 +24,9 @@ export default function App() {
   const [view, setView] = useState({ name: 'idle' })
   const [tray, setTray] = useState([]) // [{ bbl, record }], in app state only, never stored
   const [comparing, setComparing] = useState(false)
+  // The broker fee checker overlays whatever view is open, like the comparison, so closing it
+  // returns to the landing page or the building it was opened from.
+  const [checkingFee, setCheckingFee] = useState(false)
   const [adding, setAdding] = useState(null) // compare search: { status: 'loading', label } | { status: 'error', message }
   const requestRef = useRef(null)
   const addRef = useRef(null)
@@ -67,7 +71,17 @@ export default function App() {
       })
     }
   }
+  const openFeeCheck = () => {
+    setComparing(false)
+    setCheckingFee(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const closeFeeCheck = () => {
+    setCheckingFee(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
   const openCompare = () => {
+    setCheckingFee(false)
     setComparing(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -75,6 +89,7 @@ export default function App() {
   // opts.startWith: 'check' opens the results on the listing checker (chosen on the landing page).
   async function search(input, { startWith } = {}) {
     setComparing(false)
+    setCheckingFee(false)
     requestRef.current?.abort()
     const controller = new AbortController()
     requestRef.current = controller
@@ -93,6 +108,7 @@ export default function App() {
 
   const reset = () => {
     setComparing(false)
+    setCheckingFee(false)
     requestRef.current?.abort()
     setView({ name: 'idle' })
   }
@@ -100,7 +116,7 @@ export default function App() {
   return (
     // Bottom padding clears the compare tray (it publishes its height) and the floating Ask button.
     // dir and lang follow the chosen language; RTL layouts lean on logical (start/end) classes.
-    <div dir={t.dir} lang={t.code} className="relative min-h-dvh" style={{ paddingBottom: `calc(var(--tray-space, 0px) + ${view.name === 'results' && !comparing ? '5.5rem' : '0px'})` }}>
+    <div dir={t.dir} lang={t.code} className="relative min-h-dvh" style={{ paddingBottom: `calc(var(--tray-space, 0px) + ${view.name === 'results' && !comparing && !checkingFee ? '5.5rem' : '0px'})` }}>
       <Backdrop />
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <button type="button" onClick={reset} className="pop-sm press flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap bg-paper px-3 py-1.5 font-display text-lg font-extrabold">
@@ -108,7 +124,7 @@ export default function App() {
           Building Vibes
         </button>
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          {(view.name !== 'idle' || comparing) && (
+          {(view.name !== 'idle' || comparing || checkingFee) && (
             // Icon only on phones (the address box sits right below on results), so the header fits.
             <button type="button" onClick={reset} aria-label={t('app.newSearch')} className="flex min-h-10 min-w-10 items-center justify-center gap-1 whitespace-nowrap px-1 text-sm font-bold underline decoration-2 underline-offset-4">
               <ArrowLeft aria-hidden size={16} className="shrink-0 rtl:-scale-x-100" /> <span className="hidden sm:inline">{t('app.newSearch')}</span>
@@ -123,8 +139,13 @@ export default function App() {
           <CompareView tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onBack={() => setComparing(false)} />
         </main>
       )}
-      <main hidden={comparing}>
-        {view.name === 'idle' && <Landing onSearch={search} />}
+      {checkingFee && (
+        <main>
+          <FeeCheck onClose={closeFeeCheck} />
+        </main>
+      )}
+      <main hidden={comparing || checkingFee}>
+        {view.name === 'idle' && <Landing onSearch={search} onFeeCheck={openFeeCheck} />}
         {view.name === 'loading' && <LoadingView query={view.query} />}
         {view.name === 'results' && (
           <>
@@ -137,6 +158,7 @@ export default function App() {
               record={view.record}
               startWith={view.startWith}
               compare={{ pinned: tray.some((x) => x.bbl === view.record.place.bbl), full: tray.length >= MAX_PINNED, onToggle: togglePinned }}
+              onFeeCheck={openFeeCheck}
             />
           </>
         )}
@@ -167,7 +189,7 @@ export default function App() {
       <footer className="px-4 pb-8 text-center text-sm text-ink/60">
         {t('app.footer')}
       </footer>
-      {!comparing && <CompareTray tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onClear={clearTray} onView={openCompare} />}
+      {!comparing && !checkingFee && <CompareTray tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onClear={clearTray} onView={openCompare} />}
     </div>
   )
 }
@@ -185,7 +207,7 @@ function headlineWords(text) {
   return words
 }
 
-function Landing({ onSearch }) {
+function Landing({ onSearch, onFeeCheck }) {
   const t = useT()
   const root = useRef(null)
   // "I have a listing to check": the next address picked opens on the listing checker.
@@ -246,6 +268,21 @@ function Landing({ onSearch }) {
             </button>
           ))}
         </div>
+        {/* The broker fee checker's entry card: its own flow, no address needed. */}
+        <button
+          type="button"
+          onClick={onFeeCheck}
+          className="fade-up pop press mt-7 flex w-full max-w-lg items-center gap-3 bg-sunny p-4 text-start sm:p-5"
+        >
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-[2.5px] border-ink bg-paper">
+            <ReceiptText aria-hidden size={24} strokeWidth={2.5} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-xl font-extrabold leading-tight">{t('fare.entry.title')}</span>
+            <span className="mt-0.5 block text-sm text-ink/75">{t('fare.entry.body')}</span>
+          </span>
+          <ArrowRight aria-hidden size={22} strokeWidth={2.75} className="shrink-0 rtl:-scale-x-100" />
+        </button>
         <p className="fade-up mt-6 text-sm font-bold">{t('landing.disclaimer')}</p>
       </div>
       <div className="mascot-in order-1 flex justify-center overflow-visible py-4 md:order-2">

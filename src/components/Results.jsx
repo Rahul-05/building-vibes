@@ -13,7 +13,7 @@ import ListingCheck from './ListingCheck.jsx'
 import DeeperRecord from './DeeperRecord.jsx'
 import { TrendAndFixes } from './Context.jsx'
 import { ComplaintsSection, DobSection, EvictionsSection, ViolationsSection } from './RecordSections.jsx'
-import { Check, ClipboardList, GitCompareArrows } from 'lucide-react'
+import { ArrowRight, Check, ClipboardList, GitCompareArrows, ReceiptText } from 'lucide-react'
 import { moodBlurb, moodLabel, scoreRecord, scoringBasis } from '../lib/scoring.js'
 import { computeInsights } from '../lib/insights.js'
 import { questionsFor } from '../lib/questions.js'
@@ -33,7 +33,8 @@ function openListingCheck() {
 
 // compare: { pinned, full, onToggle } from App's compare tray (optional).
 // startWith: 'check' when the visitor asked for the listing checker on the landing page.
-export default function Results({ record, compare, startWith }) {
+// onFeeCheck: opens the broker fee checker (App).
+export default function Results({ record, compare, startWith, onFeeCheck }) {
   const t = useT()
   // The AI summary is always built in English; what the page shows is in the visitor's language.
   const summary = useMemo(() => buildSummary(record, scoreRecord(record), computeInsights(record)), [record])
@@ -138,10 +139,21 @@ export default function Results({ record, compare, startWith }) {
       <DeeperRecord record={record} />
       <Questions questions={questions} />
       <AskBuilding summary={summary} mood={mood} />
-      <ListingCheck summary={summary} mood={mood} />
+      <ListingCheck summary={summary} mood={mood} onFeeCheck={onFeeCheck} />
       <VibeCard place={place} mood={mood} counts={counts} />
       {/* Trend and fix rate close the page: the last substantive thing a reader reaches. */}
       <TrendAndFixes trend={insights.trend} fixRate={insights.fixRate} />
+
+      {onFeeCheck && (
+        <button type="button" onClick={onFeeCheck} className="reveal pop press flex w-full items-center gap-3 bg-sunny p-4 text-start sm:p-5">
+          <ReceiptText aria-hidden size={26} strokeWidth={2.5} className="shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-xl font-extrabold leading-tight">{t('fare.results.title')}</span>
+            <span className="mt-0.5 block text-sm text-ink/75">{t('fare.results.body')}</span>
+          </span>
+          <ArrowRight aria-hidden size={22} strokeWidth={2.75} className="shrink-0 rtl:-scale-x-100" />
+        </button>
+      )}
 
       <div className="reveal text-center">
         <Disclaimer />

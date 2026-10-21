@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { ClipboardList, Search, X } from 'lucide-react'
+import { ClipboardList, ReceiptText, Search, X } from 'lucide-react'
 import Mascot from './Mascot.jsx'
 import Disclaimer from './Disclaimer.jsx'
 import AiFooter from './AiFooter.jsx'
 import { checkListing } from '../data/index.js'
-import { MAX_LISTING_CHARS, looksLikeListing } from '../lib/listing.js'
+import { MAX_LISTING_CHARS, looksLikeListing, mentionsFee } from '../lib/listing.js'
 import { prefersReducedMotion } from '../lib/motion.js'
 import { LANGUAGE_BY_CODE, useT } from '../i18n/index.jsx'
 
@@ -14,7 +14,8 @@ const NO_MENTION = "The record doesn't mention this."
 
 // "Check a listing": the visitor pastes listing text, the AI helper sets each claim beside what the
 // record shows. The text lives only in this component's state and the one request; nothing is stored.
-export default function ListingCheck({ summary, mood }) {
+// onFeeCheck (optional): opens the broker fee checker when the pasted text mentions a fee.
+export default function ListingCheck({ summary, mood, onFeeCheck }) {
   const t = useT()
   const [text, setText] = useState('')
   const [result, setResult] = useState({ status: 'idle' }) // idle | notListing | checking | done | text | failed
@@ -89,6 +90,15 @@ export default function ListingCheck({ summary, mood }) {
           <span className="font-medium text-ink/75">{t('check.privacy')}</span>
           <span className="whitespace-nowrap text-xs text-ink/55">{t.num(text.length)} / {t.num(MAX_LISTING_CHARS)}</span>
         </p>
+        {onFeeCheck && mentionsFee(text) && (
+          <p className="pop-sm mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 bg-sunny p-3 text-sm font-medium">
+            <ReceiptText aria-hidden size={18} strokeWidth={2.5} className="shrink-0" />
+            <span className="min-w-0 flex-1">{t('fare.listingHint')}</span>
+            <button type="button" onClick={onFeeCheck} className="min-h-10 font-bold underline decoration-2 underline-offset-4">
+              {t('fare.listingHintButton')}
+            </button>
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="submit"
