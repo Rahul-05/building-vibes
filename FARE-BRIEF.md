@@ -26,7 +26,7 @@ A guided "check a broker fee" flow inside the existing site, next to the listing
 
 ## Integration
 - Entry points: a card on the home screen ("Charged a broker fee? Check it"), a link at the end of building results ("About to sign? Check the fee first"), and a hint inside the listing checker when pasted listing text mentions a broker fee or a similar charge under another label.
-- i18n: every new string goes into src/i18n/en.json and gets translated by scripts/translate-ui.mjs into the SAME 40 languages as the current set. No new languages (the user capped the set at 40 on Oct 21).
+- i18n: every new string goes into src/i18n/en.json. Languages are CLOSED (user, Oct 21) — do not run the translator; other languages fall back to English for the new strings, which is accepted.
 - Data: none. No city dataset, no network calls, answers never leave the device.
 
 ## Done means
