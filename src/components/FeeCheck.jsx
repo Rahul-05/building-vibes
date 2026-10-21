@@ -43,7 +43,7 @@ export default function FeeCheck({ onClose, initial }) {
   useLayoutEffect(() => {
     if (prefersReducedMotion()) return
     const ctx = gsap.context(() => {
-      gsap.from('.fee-in', { y: 24, opacity: 0, duration: 0.45, stagger: 0.07, ease: 'back.out(1.6)' })
+      gsap.from('.fee-in', { y: 24, opacity: 0, duration: 0.45, stagger: 0.07, ease: 'back.out(1.6)', clearProps: 'transform' })
     }, root)
     return () => ctx.revert()
   }, [step])

@@ -220,7 +220,7 @@ function Landing({ onSearch, onFeeCheck }) {
       gsap.timeline({ defaults: { ease: 'back.out(1.8)' } })
         .from('.word', { y: 60, rotation: () => gsap.utils.random(-12, 12), opacity: 0, duration: 0.7, stagger: 0.08 })
         .from('.mascot-in', { scale: 0.98, opacity: 0, duration: 1, ease: 'power1.out' }, '-=0.5')
-        .from('.fade-up', { y: 24, opacity: 0, duration: 0.5, stagger: 0.1, ease: 'power3.out' }, '-=0.6')
+        .from('.fade-up', { y: 24, opacity: 0, duration: 0.5, stagger: 0.1, ease: 'power3.out', clearProps: 'transform' }, '-=0.6')
     }, root)
     return () => ctx.revert()
   }, [])
@@ -283,7 +283,7 @@ function Landing({ onSearch, onFeeCheck }) {
           </span>
           <ArrowRight aria-hidden size={22} strokeWidth={2.75} className="shrink-0 rtl:-scale-x-100" />
         </button>
-        <p className="fade-up mt-6 text-sm font-bold">{t('landing.disclaimer')}</p>
+        <p className="fade-up relative z-10 mt-6 text-sm font-bold">{t('landing.disclaimer')}</p>
       </div>
       <div className="mascot-in order-1 flex justify-center overflow-visible py-4 md:order-2">
         <Mascot mood="happy" className="h-52 w-52 sm:h-72 sm:w-72 md:h-80 md:w-80" title={t('mascot.happy')} />

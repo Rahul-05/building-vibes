@@ -56,8 +56,8 @@ export default function Results({ record, compare, startWith, onFeeCheck }) {
     const t = setTimeout(() => setShownMood(mood), reduce ? 0 : 650)
     if (reduce) return () => clearTimeout(t)
     const ctx = gsap.context(() => {
-      gsap.from('.hero', { y: 30, scale: 0.96, opacity: 0, duration: 0.6, ease: 'back.out(1.7)' })
-      gsap.from('.reveal', { y: 50, opacity: 0, duration: 0.7, stagger: 0.12, delay: 0.25, ease: 'power3.out' })
+      gsap.from('.hero', { y: 30, scale: 0.96, opacity: 0, duration: 0.6, ease: 'back.out(1.7)', clearProps: 'transform' })
+      gsap.from('.reveal', { y: 50, opacity: 0, duration: 0.7, stagger: 0.12, delay: 0.25, ease: 'power3.out', clearProps: 'transform' })
       gsap.from('.bar', { width: 0, duration: 1, delay: 0.6, stagger: 0.06, ease: 'power3.out' })
     }, root)
     return () => {
