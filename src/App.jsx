@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { ArrowLeft, ClipboardList, Sparkles } from 'lucide-react'
 import Backdrop from './components/Backdrop.jsx'
 import Mascot from './components/Mascot.jsx'
 import AddressSearch from './components/AddressSearch.jsx'
@@ -69,7 +69,8 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  async function search(input) {
+  // opts.startWith: 'check' opens the results on the listing checker (chosen on the landing page).
+  async function search(input, { startWith } = {}) {
     setComparing(false)
     requestRef.current?.abort()
     const controller = new AbortController()
@@ -79,7 +80,7 @@ export default function App() {
 
     try {
       const record = await getBuildingRecord(input, { signal: controller.signal })
-      if (!controller.signal.aborted) setView({ name: 'results', record })
+      if (!controller.signal.aborted) setView({ name: 'results', record, startWith })
     } catch (err) {
       if (controller.signal.aborted) return
       if (err instanceof AddressNotFoundError) setView({ name: 'notFound', query: input })
@@ -126,6 +127,7 @@ export default function App() {
             <Results
               key={view.record.place.bbl + view.record.fetchedAt}
               record={view.record}
+              startWith={view.startWith}
               compare={{ pinned: tray.some((x) => x.bbl === view.record.place.bbl), full: tray.length >= MAX_PINNED, onToggle: togglePinned }}
             />
           </>
@@ -164,6 +166,9 @@ export default function App() {
 
 function Landing({ onSearch }) {
   const root = useRef(null)
+  // "I have a listing to check": the next address picked opens on the listing checker.
+  const [withListing, setWithListing] = useState(false)
+  const go = (input) => onSearch(input, withListing ? { startWith: 'check' } : undefined)
 
   useLayoutEffect(() => {
     if (prefersReducedMotion()) return
@@ -201,12 +206,28 @@ function Landing({ onSearch }) {
         </p>
         {/* fade-up leaves a transform (own stacking context), so lift this one above its siblings. */}
         <div className="fade-up relative z-50 mt-7">
-          <AddressSearch onSearch={onSearch} autoFocus />
+          <AddressSearch onSearch={go} autoFocus />
+        </div>
+        <div className="fade-up mt-3">
+          <button
+            type="button"
+            onClick={() => setWithListing((v) => !v)}
+            aria-pressed={withListing}
+            className={`pop-sm press inline-flex min-h-10 items-center gap-1.5 px-3 py-1.5 text-left text-sm font-bold ${withListing ? 'bg-lilac' : 'bg-paper'}`}
+          >
+            <ClipboardList aria-hidden size={16} strokeWidth={2.5} className="shrink-0" />
+            {withListing ? 'Listing checker on: pick the address above' : 'I also have a rental listing to check'}
+          </button>
+          {withListing && (
+            <p className="mt-2 max-w-lg text-sm text-ink/70">
+              The building’s record opens with the listing checker ready. Paste the listing there to see its claims next to the record.
+            </p>
+          )}
         </div>
         <div className="fade-up mt-4 flex flex-wrap items-center gap-2 text-sm">
           <span className="flex items-center gap-1 font-bold"><Sparkles aria-hidden size={16} /> Try:</span>
           {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" onClick={() => onSearch(ex)} className="min-h-10 whitespace-nowrap rounded-full border-2 border-ink bg-paper px-3 py-1 font-medium hover:bg-sunny">
+            <button key={ex} type="button" onClick={() => go(ex)} className="min-h-10 whitespace-nowrap rounded-full border-2 border-ink bg-paper px-3 py-1 font-medium hover:bg-sunny">
               {ex}
             </button>
           ))}

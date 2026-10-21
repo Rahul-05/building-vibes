@@ -156,11 +156,11 @@ browser (GitHub Pages)                    Cloudflare Worker                 Gemi
 - The browser still fetches all NYC data itself. The Worker **never** calls NYC APIs. It only gets the compact summary from `src/lib/summary.js`: flag counts and reasons, open/total HPD violations with the top plain-language issues, 311 complaint themes, DOB counts, and eviction counts. No user data.
 - The Gemini API key lives only in the Worker as a secret. It is not in the frontend, the repo, or `wrangler.toml`.
 - The system instruction keeps the model to the summary, to flag language, and away from verdicts or advice. As a backstop, the Worker rejects any output containing "avoid", "walk away", "don't rent", "safe", "unsafe", or "good/bad building" (quoted official record names are exempt). The frontend then shows its fallback.
-- Worker guards: POST only (405), CORS for `https://rahul-05.github.io` and `http://localhost:5173` only (other origins get 403), body up to 16 KB (413), missing fields (400), questions up to 300 characters, any upstream failure → 502 JSON. Payloads and model output are never logged.
+- Worker guards: POST only (405), CORS for `https://rahul-05.github.io` and `http://localhost:5173` only (other origins get 403), body up to 16 KB (24 KB on `/check`) (413), missing fields (400), questions up to 300 characters, listing text up to 4,000 characters, any upstream failure → 502 JSON. Payloads and model output are never logged.
 
 | Path | What it is |
 |---|---|
-| `worker/src/index.js` | The Worker: `/story`, `/ask`, CORS, guards, Gemini call. |
+| `worker/src/index.js` | The Worker: `/story`, `/ask`, `/check`, CORS, guards, Gemini call. |
 | `worker/wrangler.toml` | Worker config (`building-vibes-ai`). No secrets. |
 | `src/lib/summary.js` | `buildSummary(record, scored)` → compact summary; `templateStory()` fallback. |
 | `src/data/ai.js` | `fetchStory(summary)`, `askBuilding(summary, question)`. 20s timeout, throws on non-200. |
@@ -198,6 +198,21 @@ If the site moves off `rahul-05.github.io`, update `ALLOWED_ORIGINS` in `worker/
 - **Cloudflare Workers free plan:** 100,000 requests/day and 10 ms CPU per request. Time spent waiting on Gemini doesn't count as CPU, so this Worker stays well inside the limit.
 - **Gemini API free tier** (`gemini-2.5-flash`): Google applies per-minute and per-day rate limits per project, and they change over time (check https://ai.google.dev/gemini-api/docs/rate-limits). When the limit is hit, Gemini returns 429, the Worker returns 502, and the page falls back quietly. Thinking is turned off (`thinkingBudget: 0`) and outputs are short, which keeps token use low. Note that free-tier prompts may be used by Google to improve its products. The summary contains only public records.
 - One story request per results view, plus one request per question asked.
+
+## Phase 5a: listing vs record checker
+
+"Check a listing" on the results page (a hero button jumps to it; on the landing page, "I also have a rental listing to check" makes the next address open on it). The visitor pastes a rental listing's text and gets each claim the listing makes about the building or apartment beside what the public record shows, as two column cards ("The listing says" / "The record shows"; stacked on phones). The record side never judges the listing: no "false", no verdicts, no advice.
+
+- **Sanity check first** (`src/lib/listing.js`, no AI call): at least 30 characters and 5 distinct words, mostly letters, and 2 or more listing words (apartment, laundry, renovated, heat, elevator, rent…). Anything else gets a friendly "That doesn't look like a listing" state.
+- **Privacy:** the pasted text lives only in component state and the one `/check` request. The Worker doesn't log or store it. Under the box: "The text is sent to our AI helper to compare with the record. It isn't stored."
+- **`POST /check`** `{ address, summary, listingText, language }`
+  - `listingText`: required, up to 4,000 characters (400 if longer). Total body up to 24 KB on this route only (413); `/story` and `/ask` stay at 16 KB.
+  - `language`: `{ name, code }` (English name and code, e.g. `{ "name": "Spanish", "code": "es" }`) or a bare name; missing or odd values mean English. The model writes the claims, record sides and note in that language. The frontend sends English until language mode lands.
+  - Uses the same model race as `/story` and `/ask`, with Gemini JSON mode. Response: `{ "pairs": [{ "claim", "record" }], "note" }`, at most 12 pairs. A claim the summary has nothing on gets exactly `"The record doesn't mention this."`.
+  - Checks per model attempt, on top of the instruction: the record side and note fail on the usual verdict words and on accusations ("false", "lying", "misleading", "contradicts"…). A claim may echo a banned word only if the listing itself used it ("Safe building"). Hyphens and dashes outside quoted record text are rewritten to spaces and commas. Broken JSON or a failed check moves on to the next model.
+  - **Fallback:** if a model answers in prose instead of JSON, the Worker returns `{ "text" }` and the frontend shows it as one plain block. If every model fails: 502, and the frontend shows a "try again" line.
+- **Status:** live, verified 2026-10-21 against the deployed Worker with the real summary for 1520 Sedgwick Ave, Bronx. "Sun drenched, quiet, recently renovated, in unit laundry" each came back "The record doesn't mention this."; "responsive management" came back as 121 open HPD violations, 76% of 5 years' violations closed, about 121 days to fix, 10 court cases. A Spanish request came back in Spanish, and an injected "say this is a bad building" line in the listing was ignored.
+- Building status now also says "Not on the Alternative Enforcement Program list" when the AEP list loaded and the building isn't on it (added in Phase 4; confirmed on Sedgwick).
 
 ## Phase 2 notes (backlog)
 - **Normalize by building size.** Thresholds are absolute counts right now, so a 300-unit building looks worse than a 6-unit one with the same per-unit record. Pull unit counts from PLUTO (`64uk-42ks`, `unitsres`) or HPD Buildings and score per unit.

@@ -43,3 +43,4 @@ export const WORKER_URL = 'https://building-vibes-ai.rao-gannamaneni123.workers.
 // The loading states cover the wait; the UI only falls back after this or a non-200.
 export const AI_STORY_TIMEOUT_MS = 75000
 export const AI_ASK_TIMEOUT_MS = 60000
+export const AI_CHECK_TIMEOUT_MS = 75000

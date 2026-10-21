@@ -14,7 +14,7 @@ import { fetchBuildingFacts } from './pluto.js'
 import { fetch311History, fetchViolationHistory } from './history.js'
 
 export { suggestAddresses, geocodeAddress }
-export { fetchStory, askBuilding } from './ai.js'
+export { fetchStory, askBuilding, checkListing } from './ai.js'
 export { DATASETS, LOOKBACK_YEARS } from './config.js'
 export { BENCHMARKS, benchmarksMeta } from './benchmarks.js'
 

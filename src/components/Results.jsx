@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
 import Mascot from './Mascot.jsx'
 import Confetti from './Confetti.jsx'
@@ -9,10 +9,11 @@ import VibeCard from './VibeCard.jsx'
 import BuildingStory from './BuildingStory.jsx'
 import AskBuilding from './AskBuilding.jsx'
 import AskFab from './AskFab.jsx'
+import ListingCheck from './ListingCheck.jsx'
 import DeeperRecord from './DeeperRecord.jsx'
 import { TrendAndFixes } from './Context.jsx'
 import { ComplaintsSection, DobSection, EvictionsSection, ViolationsSection } from './RecordSections.jsx'
-import { Check, GitCompareArrows } from 'lucide-react'
+import { Check, ClipboardList, GitCompareArrows } from 'lucide-react'
 import { MOOD_COPY, scoreRecord, scoringBasis } from '../lib/scoring.js'
 import { computeInsights } from '../lib/insights.js'
 import { questionsFor } from '../lib/questions.js'
@@ -35,8 +36,15 @@ const SOURCE_NAMES = {
   complaintHistory: '311 history',
 }
 
+// Jump to the listing checker and focus its text box (inside a tap, so phones open the keyboard).
+function openListingCheck() {
+  document.getElementById('check-listing')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' })
+  document.getElementById('check-input')?.focus({ preventScroll: true })
+}
+
 // compare: { pinned, full, onToggle } from App's compare tray (optional).
-export default function Results({ record, compare }) {
+// startWith: 'check' when the visitor asked for the listing checker on the landing page.
+export default function Results({ record, compare, startWith }) {
   const scored = useMemo(() => scoreRecord(record), [record])
   const { flags, counts, mood } = scored
   const insights = useMemo(() => computeInsights(record), [record])
@@ -64,6 +72,14 @@ export default function Results({ record, compare }) {
       ctx.revert()
     }
   }, [mood])
+
+  // Arriving from the landing page's "check a listing" choice: open on the checker once the
+  // entrance animation has settled.
+  useEffect(() => {
+    if (startWith !== 'check') return
+    const t = setTimeout(openListingCheck, prefersReducedMotion() ? 0 : 900)
+    return () => clearTimeout(t)
+  }, [startWith])
 
   return (
     <div ref={root} className="mx-auto w-full max-w-3xl space-y-6 px-4 pb-16 sm:px-6">
@@ -98,6 +114,13 @@ export default function Results({ record, compare }) {
                   {compare.pinned ? 'Pinned to compare' : compare.full ? 'Compare tray is full (3)' : 'Compare this building'}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={openListingCheck}
+                className="pop-sm press inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap bg-paper px-3 py-1.5 text-sm font-bold"
+              >
+                <ClipboardList aria-hidden size={16} strokeWidth={2.5} /> Check a listing
+              </button>
             </div>
           </div>
         </div>
@@ -123,6 +146,7 @@ export default function Results({ record, compare }) {
       <DeeperRecord record={record} />
       <Questions questions={questions} />
       <AskBuilding summary={summary} mood={mood} />
+      <ListingCheck summary={summary} mood={mood} />
       <VibeCard place={place} mood={mood} counts={counts} />
       {/* Trend and fix rate close the page: the last substantive thing a reader reaches. */}
       <TrendAndFixes trend={insights.trend} fixRate={insights.fixRate} />
