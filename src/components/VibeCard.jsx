@@ -1,15 +1,16 @@
 import Mascot from './Mascot.jsx'
-import { DISCLAIMER } from './Disclaimer.jsx'
-import { MOOD_COPY } from '../lib/scoring.js'
+import { moodLabel } from '../lib/scoring.js'
+import { useT } from '../i18n/index.jsx'
 
 // Contrasting backgrounds so the mascot (whose body color tracks mood) always pops.
 const MOOD_BG = { happy: 'bg-sunny', mixed: 'bg-sky', worried: 'bg-lilac' }
 
 // Static share card (Phase 1). Phase 2: export to image / share link.
 export default function VibeCard({ place, mood, counts }) {
+  const t = useT()
   return (
     <section aria-labelledby="vibecard-heading" className="reveal">
-      <h2 id="vibecard-heading" className="mb-3 text-2xl font-extrabold sm:text-3xl">Your vibe card</h2>
+      <h2 id="vibecard-heading" className="mb-3 text-2xl font-extrabold sm:text-3xl">{t('vibecard.heading')}</h2>
       <div className={`pop relative mx-auto max-w-sm p-5 sm:p-6 ${MOOD_BG[mood]}`}>
         {/* decorative shapes, clipped to the card on their own layer so the mascot never is */}
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[25px]">
@@ -23,7 +24,7 @@ export default function VibeCard({ place, mood, counts }) {
             <Mascot mood={mood} className="h-24 w-24 sm:h-28 sm:w-28" />
           </div>
           <div className="min-w-0">
-            <p className="font-display text-2xl font-extrabold leading-tight">{MOOD_COPY[mood].label}</p>
+            <p className="font-display text-2xl font-extrabold leading-tight">{moodLabel(mood, t)}</p>
             <p className="mt-1 text-sm font-medium">{place.name}</p>
             <p className="text-sm opacity-75">{place.borough}</p>
           </div>
@@ -32,12 +33,12 @@ export default function VibeCard({ place, mood, counts }) {
         <div className="relative mt-4 grid grid-cols-3 gap-2 text-center">
           {[['red', 'bg-tomato'], ['yellow', 'bg-sunny'], ['green', 'bg-mint']].map(([level, bg]) => (
             <div key={level} className={`rounded-2xl border-[2.5px] border-ink py-2 ${bg}`}>
-              <p className="font-display text-2xl font-extrabold">{counts[level]}</p>
-              <p className="text-[11px] font-bold uppercase">{level}</p>
+              <p className="font-display text-2xl font-extrabold">{t.num(counts[level])}</p>
+              <p className="text-[11px] font-bold uppercase">{t(`level.${level}`)}</p>
             </div>
           ))}
         </div>
-        <p className="relative mt-4 text-center text-xs font-bold">{DISCLAIMER}</p>
+        <p className="relative mt-4 text-center text-xs font-bold">{t('disclaimer')}</p>
       </div>
     </section>
   )

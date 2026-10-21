@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { ChevronDown, Flag } from 'lucide-react'
-import { CONTEXT_RULES, RULES } from '../lib/scoring.js'
+import { contextRulesFor, rulesFor } from '../lib/scoring.js'
 import { HowItCompares } from './Context.jsx'
+import { useT } from '../i18n/index.jsx'
 
+// Labels are flags.red / flags.yellow / flags.green in the dictionary.
 export const FLAG_STYLES = {
-  red: { bg: 'bg-tomato', soft: 'bg-tomato/15', text: 'text-ink', label: 'Red flags' },
-  yellow: { bg: 'bg-sunny', soft: 'bg-sunny/25', text: 'text-ink', label: 'Yellow flags' },
-  green: { bg: 'bg-mint', soft: 'bg-mint/30', text: 'text-ink', label: 'Green flags' },
+  red: { bg: 'bg-tomato', soft: 'bg-tomato/15', text: 'text-ink' },
+  yellow: { bg: 'bg-sunny', soft: 'bg-sunny/25', text: 'text-ink' },
+  green: { bg: 'bg-mint', soft: 'bg-mint/30', text: 'text-ink' },
 }
 
 export function FlagDot({ level, size = 'h-3.5 w-3.5' }) {
@@ -14,12 +16,13 @@ export function FlagDot({ level, size = 'h-3.5 w-3.5' }) {
 }
 
 export default function FlagSummary({ flags, counts, benchmark, basis }) {
+  const t = useT()
   const [showRules, setShowRules] = useState(false)
 
   return (
     <section aria-labelledby="flags-heading" className="pop reveal bg-paper p-5 sm:p-7">
       <h2 id="flags-heading" className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl">
-        <Flag aria-hidden strokeWidth={2.75} /> The flags
+        <Flag aria-hidden strokeWidth={2.75} /> {t('flags.heading')}
       </h2>
 
       <div className="mt-5 grid grid-cols-3 gap-3">
@@ -27,7 +30,7 @@ export default function FlagSummary({ flags, counts, benchmark, basis }) {
           <div key={level} className={`pop-sm flex min-w-0 flex-col items-center px-1 py-4 text-center ${FLAG_STYLES[level].bg}`}>
             <span className="font-display text-4xl font-extrabold sm:text-5xl">{counts[level]}</span>
             {/* Two short words, so at phone width the label wraps between them, never inside one. */}
-            <span className="text-[11px] font-bold uppercase leading-tight tracking-wide sm:text-sm">{FLAG_STYLES[level].label}</span>
+            <span className="text-[11px] font-bold uppercase leading-tight tracking-wide sm:text-sm">{t(`flags.${level}`)}</span>
           </div>
         ))}
       </div>
@@ -48,7 +51,7 @@ export default function FlagSummary({ flags, counts, benchmark, basis }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-6 text-ink/70">Not enough data came back to raise any flags.</p>
+        <p className="mt-6 text-ink/70">{t('flags.none')}</p>
       )}
 
       {benchmark && <HowItCompares benchmark={benchmark} />}
@@ -59,17 +62,17 @@ export default function FlagSummary({ flags, counts, benchmark, basis }) {
         aria-expanded={showRules}
         className="mt-3 inline-flex min-h-10 items-center gap-1 text-sm font-bold underline decoration-2 underline-offset-4"
       >
-        How we pick flags
+        {t('flags.howWePick')}
         <ChevronDown aria-hidden size={16} className={`transition-transform ${showRules ? 'rotate-180' : ''}`} />
       </button>
       {showRules && (
         <div className="mt-3 space-y-3 text-sm text-ink/75">
           {basis && <p className="font-bold text-ink">{basis}</p>}
-          <ul className="list-disc space-y-1 pl-5">
-            {RULES.map((r) => <li key={r}>{r}</li>)}
+          <ul className="list-disc space-y-1 ps-5">
+            {rulesFor(t).map((r) => <li key={r}>{r}</li>)}
           </ul>
-          <ul className="list-disc space-y-1 pl-5">
-            {CONTEXT_RULES.map((r) => <li key={r}>{r}</li>)}
+          <ul className="list-disc space-y-1 ps-5">
+            {contextRulesFor(t).map((r) => <li key={r}>{r}</li>)}
           </ul>
         </div>
       )}

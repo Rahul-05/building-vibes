@@ -214,13 +214,24 @@ If the site moves off `rahul-05.github.io`, update `ALLOWED_ORIGINS` in `worker/
 - **Status:** live, verified 2026-10-21 against the deployed Worker with the real summary for 1520 Sedgwick Ave, Bronx. "Sun drenched, quiet, recently renovated, in unit laundry" each came back "The record doesn't mention this."; "responsive management" came back as 121 open HPD violations, 76% of 5 years' violations closed, about 121 days to fix, 10 court cases. A Spanish request came back in Spanish, and an injected "say this is a bad building" line in the listing was ignored.
 - Building status now also says "Not on the Alternative Enforcement Program list" when the AEP list loaded and the building isn't on it (added in Phase 4; confirmed on Sedgwick).
 
+## Phase 5b: all-languages mode (DONE 2026-10-21)
+
+Every UI string lives in `src/i18n/en.json`; components read it through a translator from `src/i18n/translator.js` (React context in `src/i18n/index.jsx`). City-published violation/complaint text is quoted official text and stays English; only the scaffolding around it translates. Numbers and dates format with `Intl.NumberFormat`/`Intl.DateTimeFormat` in the visitor's language; `dir="rtl"` is set on the document for RTL languages.
+
+- **Selector:** searchable language picker with NYC's 11 pinned under "Popular in NYC", then every other Google-supported language by its own endonym (`src/i18n/languages.js`). A language appears only if its dictionary file exists (English always). Each `src/i18n/<code>.json` is its own lazy chunk; the choice persists in localStorage as a display preference only.
+- **Build-time translations:** `node scripts/translate-ui.mjs <codes...>` reads the Gemini key from the `GEMINI_API_KEY` env var (never committed) and translates `en.json` in batches, writing `src/i18n/<code>.json`. It is incremental and resumable (`scripts/translate-state.json` tracks per-key hashes), preserves `{placeholder}` tokens, validates JSON per language, and instructs the model to keep accents as real Unicode and never use hyphens or dashes. Missing keys fall back to English at runtime, so partial dictionaries still render.
+- **AI in the visitor's language:** `/story`, `/ask`, `/check` take `language: { name, code }`; the Worker instructs the model to write the whole answer in that language (accents as real Unicode), with the no-verdict rule applying in every language. The Worker no longer appends a footer: the frontend adds the dictionary's translated "public record information, not advice" line (`AiFooter.jsx`) under every AI block.
+- **Verdict checks:** English banned-word check stays; `BANNED_BY_LANGUAGE` in `worker/src/index.js` adds obvious equivalents for NYC's 11 (Spanish, French, Russian, Polish, Haitian Creole, Bengali, Urdu, Arabic, Chinese, Korean), not exhaustive. Quoted spans («», „", 「」 as well as "" "") stay exempt.
+- **Shipped 2026-10-21:** English + Spanish, French, Bengali, Arabic (full), Russian, Haitian Creole, Simplified Chinese (partial, resumable). Verified: Spanish and Arabic render via SSR with correct chrome and `dir="rtl"` for Arabic; a Spanish `/story` against the deployed Worker returns Spanish text with accents, no Worker footer, no verdicts.
+- The full ~240-language list stays open: run the script incrementally as free-tier quota allows; any new `<code>.json` in `src/i18n/` appears in the picker automatically.
+
 ## Phase 2 notes (backlog)
 - **Normalize by building size.** Thresholds are absolute counts right now, so a 300-unit building looks worse than a 6-unit one with the same per-unit record. Pull unit counts from PLUTO (`64uk-42ks`, `unitsres`) or HPD Buildings and score per unit.
 - **Shareable vibe card:** export to PNG (e.g. `html-to-image`) and add `?bbl=` deep links so a result can be shared without any server.
 - **DOB category labels:** add the post-2021 codes once DOB publishes an updated list. Consider merging DOB ECB/OATH violations.
 - **More context:** rent stabilization (DHCR), heat-season-only filtering for heat complaints, trend over time ("getting better/worse").
 - **Accessibility pass** with real assistive-tech testing. Phase 1 has reduced-motion support, labeled controls, and a keyboard-navigable combobox.
-- **Translations** (Spanish, Chinese, etc.) for UI copy and question templates.
+- **Translations** (Spanish, Chinese, etc.) for UI copy and question templates. DONE in Phase 5b (all-languages mode); full 240-language coverage continues incrementally via `scripts/translate-ui.mjs`.
 - **Tests:** unit tests for `plainLanguage.js` and `scoring.js`, plus recorded API fixtures for the data layer.
 - **Self-host fonts.** Phase 1 loads Bricolage Grotesque and DM Sans from Google Fonts, the one third-party request besides the city APIs.
 - Out of scope by design: landlord portfolio mapping, tenant reviews, comments, accounts.

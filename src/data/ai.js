@@ -29,24 +29,25 @@ async function postWorker(path, body, timeoutMs, { signal } = {}) {
   }
 }
 
-export async function fetchStory(summary, opts) {
-  const { story } = await postWorker('/story', { address: summary.address, summary }, AI_STORY_TIMEOUT_MS, opts)
+// `language` is { name, code }: the English name and code of the visitor's language, e.g.
+// { name: 'Spanish', code: 'es' }. The AI helper writes its whole answer in it.
+const ENGLISH = { name: 'English', code: 'en' }
+
+export async function fetchStory(summary, { language = ENGLISH, ...opts } = {}) {
+  const { story } = await postWorker('/story', { address: summary.address, summary, language }, AI_STORY_TIMEOUT_MS, opts)
   if (!story) throw new Error('Empty story')
   return story
 }
 
-export async function askBuilding(summary, question, opts) {
-  const { answer } = await postWorker('/ask', { address: summary.address, summary, question }, AI_ASK_TIMEOUT_MS, opts)
+export async function askBuilding(summary, question, { language = ENGLISH, ...opts } = {}) {
+  const { answer } = await postWorker('/ask', { address: summary.address, summary, question, language }, AI_ASK_TIMEOUT_MS, opts)
   if (!answer) throw new Error('Empty answer')
   return answer
 }
 
-// Language mode isn't built yet, so the checker always asks for English for now.
-const ENGLISH = { name: 'English', code: 'en' }
-
-// → { pairs: [{ claim, record }], note } or, when the model wrote prose, { text }.
-export async function checkListing(summary, listingText, opts) {
-  const result = await postWorker('/check', { address: summary.address, summary, listingText, language: ENGLISH }, AI_CHECK_TIMEOUT_MS, opts)
+// → { pairs: [{ claim, record, noMention }], note } or, when the model wrote prose, { text }.
+export async function checkListing(summary, listingText, { language = ENGLISH, ...opts } = {}) {
+  const result = await postWorker('/check', { address: summary.address, summary, listingText, language }, AI_CHECK_TIMEOUT_MS, opts)
   if (Array.isArray(result?.pairs)) return { pairs: result.pairs, note: result.note || '' }
   if (result?.text) return { text: result.text }
   throw new Error('Empty check')

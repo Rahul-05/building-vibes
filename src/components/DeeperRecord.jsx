@@ -1,13 +1,12 @@
 import { AlertTriangle, Bug, KeyRound, Layers, Scale, Siren } from 'lucide-react'
-import { bedbugFilingIsRecent } from '../lib/scoring.js'
-import { formatDate, plural } from '../lib/plainLanguage.js'
+import { aepRound, bedbugFilingIsRecent } from '../lib/scoring.js'
+import { useT } from '../i18n/index.jsx'
 
 // "Deeper record": AEP + vacate orders, HPD court cases, bedbug filings, owner and last sale.
 // Each block handles its own failure; blocks whose absence says nothing are left out entirely.
+// Case types, vacate reasons and names are the city's own text and stay as published.
 
-const monthYear = (iso) => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '')
-const money = (n) => `$${Math.round(n).toLocaleString()}`
-const SAME_LOT = 'This is for another building on the same tax lot; we couldn’t match it to this exact building.'
+const money = (n, t) => `$${t.num(Math.round(n))}`
 
 function Block({ icon: Icon, title, accent, children }) {
   return (
@@ -23,16 +22,24 @@ function Block({ icon: Icon, title, accent, children }) {
   )
 }
 
-const Unavailable = ({ what }) => (
-  <p className="flex items-center gap-2 rounded-xl bg-ink/5 p-3 text-sm text-ink/70">
-    <AlertTriangle aria-hidden size={16} /> {what} didn’t load right now.
-  </p>
-)
+function Unavailable({ what }) {
+  const t = useT()
+  return (
+    <p className="flex items-center gap-2 rounded-xl bg-ink/5 p-3 text-sm text-ink/70">
+      <AlertTriangle aria-hidden size={16} className="shrink-0" /> {t('deeper.unavailable', { what: t(`deeper.what.${what}`) })}
+    </p>
+  )
+}
+function SameLot() {
+  const t = useT()
+  return <Note>{t('deeper.sameLot')}</Note>
+}
 const Quiet = ({ children }) => <p className="rounded-xl bg-ink/5 p-3 text-sm font-medium text-ink/75">{children}</p>
 const Note = ({ children }) => <p className="text-xs text-ink/55">{children}</p>
 const Badge = ({ cls, children }) => <span className={`pill border-2 border-ink px-2.5 py-0.5 text-xs font-bold ${cls}`}>{children}</span>
 
 function StatusBlock({ aep, vacate }) {
+  const t = useT()
   const hasAep = aep && !aep.error && aep.listings.length > 0
   const hasVacate = vacate && !vacate.error && vacate.orders.length > 0
   // Not being on the vacate list says little, but AEP absence is worth stating, so the block shows whenever the AEP list loaded.
@@ -40,43 +47,48 @@ function StatusBlock({ aep, vacate }) {
 
   const listing = hasAep ? aep.listings.find((l) => l.active) || aep.listings[0] : null
   return (
-    <Block icon={Siren} title="Building status" accent="bg-tomato">
-      {aep?.error && <Unavailable what="The AEP list" />}
-      {aep && !aep.error && !hasAep && <Quiet>Not on the Alternative Enforcement Program list (the city’s worst conditions list).</Quiet>}
+    <Block icon={Siren} title={t('deeper.status.title')} accent="bg-tomato">
+      {aep?.error && <Unavailable what="aep" />}
+      {aep && !aep.error && !hasAep && <Quiet>{t('deeper.status.notOnAep')}</Quiet>}
       {listing && (
         <div className={`rounded-xl p-3 ${listing.active ? 'bg-tomato/15' : 'bg-ink/5'}`}>
           <p className="font-bold">
-            {listing.active ? 'On the city’s worst conditions list (AEP) now' : 'Was on the city’s worst conditions list (AEP)'}
+            {listing.active ? t('deeper.status.aepNow') : t('deeper.status.aepWas')}
           </p>
           <p className="text-sm text-ink/75">
-            {[listing.round, listing.active ? `since ${monthYear(listing.startDate)}` : `${monthYear(listing.startDate)} to ${monthYear(listing.dischargeDate)}, since discharged`].filter(Boolean).join(' · ')}
-            {listing.violationsAtStart ? ` · ${plural(listing.violationsAtStart, 'open B/C violation')} when selected` : ''}
+            {[
+              aepRound(listing.round, t),
+              listing.active
+                ? t('deeper.status.since', { date: t.monthYear(listing.startDate) })
+                : t('deeper.status.range', { start: t.monthYear(listing.startDate), end: t.monthYear(listing.dischargeDate) }),
+            ].filter(Boolean).join(' · ')}
+            {listing.violationsAtStart ? ` · ${t('deeper.status.atStart', { count: t.count('openBC', listing.violationsAtStart) })}` : ''}
           </p>
-          {aep.listings.length > 1 && <Note>{plural(aep.listings.length, 'AEP listing')} on record in total.</Note>}
-          {aep.scope === 'lot' && <Note>{SAME_LOT}</Note>}
+          {aep.listings.length > 1 && <Note>{t('deeper.status.total', { count: t.count('aepListing', aep.listings.length) })}</Note>}
+          {aep.scope === 'lot' && <SameLot />}
         </div>
       )}
 
-      {vacate?.error && <Unavailable what="Vacate orders" />}
+      {vacate?.error && <Unavailable what="vacate" />}
       {hasVacate && (
         <div>
-          <p className="text-sm font-bold">{plural(vacate.orders.length, 'HPD vacate order')}</p>
+          <p className="text-sm font-bold">{t.count('hpdVacateOrder', vacate.orders.length)}</p>
           <ul className="mt-1 divide-y-2 divide-dashed divide-ink/15">
             {vacate.orders.slice(0, 4).map((o) => (
               <li key={o.id} className="flex items-start justify-between gap-3 py-2">
                 <div className="min-w-0">
-                  <p className="font-medium">{[o.type && `${o.type} vacate`, o.reason.toLowerCase()].filter(Boolean).join(' · ')}</p>
+                  <p className="font-medium">{[o.type && t('deeper.vacate.type', { type: o.type }), o.reason.toLowerCase()].filter(Boolean).join(' · ')}</p>
                   <p className="text-sm text-ink/55">
-                    {formatDate(o.effectiveDate)}
-                    {o.units ? ` · ${plural(o.units, 'apartment')}` : ''}
-                    {o.lifted && ` · lifted ${formatDate(o.rescindedDate)}`}
+                    {t.date(o.effectiveDate)}
+                    {o.units ? ` · ${t.count('apartment', o.units)}` : ''}
+                    {o.lifted && ` · ${t('deeper.vacate.lifted', { date: t.date(o.rescindedDate) })}`}
                   </p>
                 </div>
-                <Badge cls={o.lifted ? 'bg-ink/5' : 'bg-tomato'}>{o.lifted ? 'Lifted' : 'Not lifted'}</Badge>
+                <Badge cls={o.lifted ? 'bg-ink/5' : 'bg-tomato'}>{o.lifted ? t('deeper.vacate.badgeLifted') : t('deeper.vacate.badgeNotLifted')}</Badge>
               </li>
             ))}
           </ul>
-          {vacate.scope === 'lot' && <Note>{SAME_LOT}</Note>}
+          {vacate.scope === 'lot' && <SameLot />}
         </div>
       )}
     </Block>
@@ -84,38 +96,39 @@ function StatusBlock({ aep, vacate }) {
 }
 
 function CourtBlock({ data }) {
+  const t = useT()
   return (
-    <Block icon={Scale} title="Court cases" accent="bg-grape">
+    <Block icon={Scale} title={t('deeper.court.title')} accent="bg-grape">
       {data?.error ? (
-        <Unavailable what="HPD court cases" />
+        <Unavailable what="court" />
       ) : !data || data.total === 0 ? (
-        <Quiet>No HPD housing court cases found in the public record.</Quiet>
+        <Quiet>{t('deeper.court.none')}</Quiet>
       ) : (
         <>
           <p className="badge-row font-medium">
-            <span>{plural(data.recentTotal, 'case')} opened in the last 5 years</span>
-            {data.open > 0 && <Badge cls="bg-sunny">{data.open} pending</Badge>}
+            <span>{t('deeper.court.opened', { count: t.count('case', data.recentTotal) })}</span>
+            {data.open > 0 && <Badge cls="bg-sunny">{t('deeper.court.pending', { n: data.open })}</Badge>}
           </p>
           {data.byType.length > 0 && (
             <ul className="space-y-1 text-sm">
-              {data.byType.slice(0, 4).map((t) => (
-                <li key={t.type} className="flex justify-between gap-3">
-                  <span className="min-w-0">{t.type}</span>
-                  <span className="shrink-0 font-display font-extrabold">{t.count}</span>
+              {data.byType.slice(0, 4).map((c) => (
+                <li key={c.type} className="flex justify-between gap-3">
+                  <span lang="en" className="min-w-0">{c.type}</span>
+                  <span className="shrink-0 font-display font-extrabold">{t.num(c.count)}</span>
                 </li>
               ))}
             </ul>
           )}
           {data.latest && (
             <p className="text-sm text-ink/70">
-              Most recent: {data.latest.type.charAt(0).toLowerCase() + data.latest.type.slice(1)}, opened {formatDate(data.latest.openedOn)} ({data.latest.status.toLowerCase()}).
+              {t('deeper.court.latest', { type: data.latest.type.charAt(0).toLowerCase() + data.latest.type.slice(1), date: t.date(data.latest.openedOn), status: data.latest.status.toLowerCase() })}
             </p>
           )}
           {data.recentHarassmentFindings > 0 && (
-            <p className="rounded-xl bg-tomato/15 p-2 text-sm font-bold">{plural(data.recentHarassmentFindings, 'case')} ended with a finding of tenant harassment.</p>
+            <p className="rounded-xl bg-tomato/15 p-2 text-sm font-bold">{t('deeper.court.harassment', { count: t.count('case', data.recentHarassmentFindings) })}</p>
           )}
-          {data.scope === 'lot' && <Note>{SAME_LOT}</Note>}
-          <Note>{plural(data.total, 'case')} on record in all. Most are brought by tenants or HPD to get repairs made; a case on its own isn’t a finding of wrongdoing.</Note>
+          {data.scope === 'lot' && <SameLot />}
+          <Note>{t('deeper.court.note', { count: t.count('case', data.total) })}</Note>
         </>
       )}
     </Block>
@@ -123,28 +136,26 @@ function CourtBlock({ data }) {
 }
 
 function BedbugBlock({ data }) {
+  const t = useT()
   const f = data?.latest
   return (
-    <Block icon={Bug} title="Bedbugs" accent="bg-sunny">
+    <Block icon={Bug} title={t('deeper.bedbugs.title')} accent="bg-sunny">
       {data?.error ? (
-        <Unavailable what="Bedbug filings" />
+        <Unavailable what="bedbugs" />
       ) : !f ? (
-        <Quiet>
-          No bedbug report found in the public record. That isn’t a clean bill of health: owners of apartment buildings
-          are required to file one every year, so a missing filing just means there’s nothing to read.
-        </Quiet>
+        <Quiet>{t('deeper.bedbugs.none')}</Quiet>
       ) : (
         <>
           <p className={`rounded-xl p-3 font-bold ${f.infested ? 'bg-sunny/30' : 'bg-ink/5'}`}>
-            {f.infested} of {plural(f.units, 'apartment')} reported infested
+            {t('deeper.bedbugs.infested', { infested: f.infested, count: t.count('apartment', f.units) })}
           </p>
           <p className="text-sm text-ink/70">
-            Landlord’s filing for {monthYear(f.periodStart)} to {monthYear(f.periodEnd)}, filed {formatDate(f.filedOn)}.
-            {(f.eradicated > 0 || f.reinfested > 0) && ` ${f.eradicated} treated successfully, ${f.reinfested} infested again.`}
+            {t('deeper.bedbugs.filing', { start: t.monthYear(f.periodStart), end: t.monthYear(f.periodEnd), date: t.date(f.filedOn) })}
+            {(f.eradicated > 0 || f.reinfested > 0) && ` ${t('deeper.bedbugs.treated', { eradicated: f.eradicated, reinfested: f.reinfested })}`}
           </p>
-          {!bedbugFilingIsRecent(data) && <Note>This is an older filing, so it doesn’t count toward the flags.</Note>}
-          {data.scope === 'lot' && <Note>{SAME_LOT}</Note>}
-          <Note>The owner reports this once a year.</Note>
+          {!bedbugFilingIsRecent(data) && <Note>{t('deeper.bedbugs.older')}</Note>}
+          {data.scope === 'lot' && <SameLot />}
+          <Note>{t('deeper.bedbugs.yearly')}</Note>
         </>
       )}
     </Block>
@@ -152,54 +163,56 @@ function BedbugBlock({ data }) {
 }
 
 function DeedLine({ label, deed }) {
+  const t = useT()
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-wide text-ink/55">{label}</p>
       <p className="badge-row font-medium">
-        <span className="whitespace-nowrap">{formatDate(deed.date)}</span>
+        <span className="whitespace-nowrap">{t.date(deed.date)}</span>
         <span aria-hidden className="text-ink/40">·</span>
-        <span>{deed.amount > 0 ? money(deed.amount) : 'no sale price recorded'}</span>
+        <span>{deed.amount > 0 ? money(deed.amount, t) : t('deeper.owner.noPrice')}</span>
       </p>
-      {deed.lots > 1 && <Note>This deed covered {deed.lots} tax lots, so the amount is for all of them.</Note>}
+      {deed.lots > 1 && <Note>{t('deeper.owner.lots', { lots: deed.lots })}</Note>}
     </div>
   )
 }
 
 function OwnershipBlock({ owner, sale }) {
+  const t = useT()
   if (!owner && !sale) return null
   return (
-    <Block icon={KeyRound} title="Ownership & last sale" accent="bg-mint">
-      {owner?.error && <Unavailable what="The HPD registration" />}
+    <Block icon={KeyRound} title={t('deeper.owner.title')} accent="bg-mint">
+      {owner?.error && <Unavailable what="registration" />}
       {owner && !owner.error && (
         <dl className="space-y-2">
           {owner.owners.length > 0 && (
             <div>
-              <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">Owner</dt>
+              <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">{t('deeper.owner.owner')}</dt>
               <dd className="font-medium wrap-anywhere">{owner.owners.join(', ')}</dd>
             </div>
           )}
           {owner.managingAgent && (
             <div>
-              <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">Managing agent</dt>
+              <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">{t('deeper.owner.agent')}</dt>
               <dd className="font-medium wrap-anywhere">{owner.managingAgent}</dd>
             </div>
           )}
           {owner.headOfficer && (
             <div>
-              <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">Head officer</dt>
+              <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">{t('deeper.owner.headOfficer')}</dt>
               <dd className="font-medium wrap-anywhere">{owner.headOfficer}</dd>
             </div>
           )}
-          <Note>From the building’s HPD registration, last filed {formatDate(owner.registeredOn)}.</Note>
+          <Note>{t('deeper.owner.registration', { date: t.date(owner.registeredOn) })}</Note>
         </dl>
       )}
 
-      {sale?.error && <Unavailable what="ACRIS sale records" />}
+      {sale?.error && <Unavailable what="acris" />}
       {sale && !sale.error && (
         <div className="space-y-2 border-t-2 border-dashed border-ink/15 pt-3">
-          <DeedLine label="Most recent deed" deed={sale.lastDeed} />
-          {sale.lastPricedSale && <DeedLine label="Last deed with a price" deed={sale.lastPricedSale} />}
-          <Note>From ACRIS, the city’s property records. Deeds between related companies often show no price.</Note>
+          <DeedLine label={t('deeper.owner.lastDeed')} deed={sale.lastDeed} />
+          {sale.lastPricedSale && <DeedLine label={t('deeper.owner.lastPriced')} deed={sale.lastPricedSale} />}
+          <Note>{t('deeper.owner.acris')}</Note>
         </div>
       )}
     </Block>
@@ -207,12 +220,13 @@ function OwnershipBlock({ owner, sale }) {
 }
 
 export default function DeeperRecord({ record }) {
+  const t = useT()
   return (
     <section aria-labelledby="deeper-heading" className="pop reveal bg-sky/20 p-5 sm:p-7">
       <h2 id="deeper-heading" className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl">
-        <Layers aria-hidden strokeWidth={2.75} /> Deeper record
+        <Layers aria-hidden strokeWidth={2.75} /> {t('deeper.heading')}
       </h2>
-      <p className="mt-1 text-ink/70">City lists, court cases, bedbug filings, and who owns the building.</p>
+      <p className="mt-1 text-ink/70">{t('deeper.intro')}</p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <StatusBlock aep={record.aep} vacate={record.vacateOrders} />
         <CourtBlock data={record.litigations} />

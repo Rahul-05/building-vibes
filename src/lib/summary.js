@@ -1,8 +1,10 @@
 // Compact, plain-language summary of an already-fetched building record. This is the ONLY
 // thing sent to the AI Worker, and the only thing the AI may talk about, so it carries
 // exactly what the results page shows: flags, counts, and the top items in plain words.
+// Always English: pass it the English scoring and insights. The AI answers in the visitor's
+// language from it; the template fallback below is written in the visitor's language.
 
-import { MOOD_COPY, bedbugFilingIsRecent } from './scoring.js'
+import { bedbugFilingIsRecent, moodLabel } from './scoring.js'
 import { groupViolations, isHousingComplaint, plainComplaintType, plainViolation, plural } from './plainLanguage.js'
 
 const day = (iso) => (iso ? iso.slice(0, 10) : null)
@@ -161,7 +163,7 @@ export function buildSummary(record, { flags, counts, mood }, insights) {
   return {
     address: [record.place.name, record.place.borough].filter(Boolean).join(', '),
     checkedOn: day(record.fetchedAt),
-    overall: MOOD_COPY[mood].label,
+    overall: moodLabel(mood),
     flagCounts: counts,
     flags: flags.map((f) => ({ level: f.level, title: f.title, detail: f.reason })),
     hpdViolations: violationsSummary(record.violations),
@@ -183,20 +185,26 @@ export function buildSummary(record, { flags, counts, mood }, insights) {
   }
 }
 
-// Offline fallback for "This building's story" when the AI helper is unavailable.
-export function templateStory(summary) {
+// Offline fallback for "This building's story" when the AI helper is unavailable, in the
+// visitor's language: t is their translator, insights the ones computed with it. Quoted city
+// text (the top violation) stays as published. record gives the raw 311 type for the label.
+export function templateStory(summary, t, insights, record) {
   const { red, yellow, green } = summary.flagCounts
-  const parts = [`The public record for ${summary.address} shows ${plural(red, 'red flag')}, ${plural(yellow, 'yellow flag')}, and ${plural(green, 'green flag')}.`]
+  const parts = [t('story.tpl.counts', { address: summary.address, red: t.count('redFlag', red), yellow: t.count('yellowFlag', yellow), green: t.count('greenFlag', green) })]
 
   const topIssue = summary.hpdViolations?.topOpenIssues?.[0]
   const topTheme = summary.complaints311?.themes?.[0]
-  if (topTheme) parts.push(`The most common 311 topic in the last 2 years is ${topTheme.theme.toLowerCase()} (${plural(topTheme.count, 'complaint')}).`)
-  if (topIssue) parts.push(`Among the open HPD violations: “${topIssue.issue}” (${plural(topIssue.count, 'listing')}).`)
-  if (summary.alternativeEnforcementProgram?.onAepListNow) parts.push('It is currently in HPD’s Alternative Enforcement Program, the city’s list of buildings with the worst conditions.')
-  if (summary.trend?.direction) parts.push(`${summary.trend.direction}. ${summary.trend.detail}`)
-  if (summary.comparedWithBorough?.openViolations) parts.push(summary.comparedWithBorough.openViolations)
-  if (summary.vacateOrders?.notLifted) parts.push(`HPD has ${plural(summary.vacateOrders.notLifted, 'vacate order')} here that hasn’t been lifted.`)
+  const topType = record?.complaints311?.byType?.find((c) => isHousingComplaint(c.type))?.type
+  const themeLabel = topType ? plainComplaintType(topType, t) : topTheme?.theme
+  if (topTheme) parts.push(t('story.tpl.topTheme', { theme: themeLabel.toLocaleLowerCase(t.code), count: t.count('complaint', topTheme.count) }))
+  if (topIssue) parts.push(t('story.tpl.topIssue', { issue: topIssue.issue, count: t.count('listing', topIssue.count) }))
+  if (summary.alternativeEnforcementProgram?.onAepListNow) parts.push(t('story.tpl.aep'))
+  const trend = insights?.trend
+  if (trend && !trend.unavailable) parts.push(`${trend.headline}. ${trend.detail}`)
+  const bench = insights?.benchmark
+  if (bench && !bench.unavailable) parts.push(bench.lines.all)
+  if (summary.vacateOrders?.notLifted) parts.push(t('story.tpl.vacate', { count: t.count('vacateOrder', summary.vacateOrders.notLifted) }))
   const loaded = [summary.hpdViolations, summary.complaints311].every((s) => s && typeof s === 'object')
-  if (!topIssue && !topTheme && loaded) parts.push('Not much shows up in the recent records we checked.')
+  if (!topIssue && !topTheme && loaded) parts.push(t('story.tpl.quiet'))
   return parts.join(' ')
 }

@@ -3,7 +3,11 @@
 // changes the mascot's mood (scoring.js only borrows the apartment count from here).
 
 import { BENCHMARKS, benchmarksMeta } from '../data/index.js'
-import { isHousingComplaint, plural } from './plainLanguage.js'
+import { isHousingComplaint } from './plainLanguage.js'
+import { EN } from '../i18n/translator.js'
+
+// Every function that writes text takes a translator `t` (English by default, which is what the
+// AI summary uses); the results page passes the visitor's language.
 
 // Keep in sync with sizeGroup() in scripts/build-benchmarks.mjs.
 export const sizeGroup = (units) => (units >= 3 ? 'apartments' : 'homes')
@@ -15,28 +19,26 @@ export function unitsFor(record) {
 }
 
 // "about 1 for every 9 apartments" / "about 2.4 per apartment"
-export function ratePhrase(count, units) {
+export function ratePhrase(count, units, t = EN) {
   if (!units || !count) return ''
   const every = units / count
-  if (every >= 1.5) return `about 1 for every ${Math.round(every).toLocaleString()} apartments`
+  if (every >= 1.5) return t('rate.every', { every: Math.round(every) })
   const per = count / units
-  return `about ${per < 10 ? String(Math.round(per * 10) / 10) : Math.round(per).toLocaleString()} per apartment`
+  return t('rate.per', { per: per < 10 ? Math.round(per * 10) / 10 : Math.round(per) })
 }
 
 // "Built 1927 · 84 apartments"
-export function buildingFactsLine(record) {
+export function buildingFactsLine(record, t = EN) {
   const b = record?.building
   if (!b || b.error) return null
   const parts = []
-  if (b.yearBuilt) parts.push(`Built ${b.yearBuilt}`)
-  if (b.unitsRes) parts.push(b.buildings > 1 ? `${plural(b.unitsRes, 'apartment')} across ${b.buildings} buildings on this tax lot` : plural(b.unitsRes, 'apartment'))
+  if (b.yearBuilt) parts.push(t('facts.built', { year: String(b.yearBuilt) }))
+  if (b.unitsRes) parts.push(b.buildings > 1 ? t('facts.across', { count: t.count('apartment', b.unitsRes), buildings: b.buildings }) : t.count('apartment', b.unitsRes))
   return parts.length ? parts.join(' · ') : null
 }
 
 // ---------------------------------------------------------------- borough comparison
 
-const monthYear = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-const boroughPlace = (name) => (name === 'Bronx' ? 'the Bronx' : name)
 const round4 = (x) => Math.round(x * 10000) / 10000
 
 // Shares strictly below and strictly above a rate, read off the stored 1st..99th percentiles.
@@ -49,33 +51,35 @@ function position(dist, rate) {
   }
 }
 
-function compareLine(dist, count, units, { what, zeroWhat, peers }) {
-  if (count === 0) return `No ${zeroWhat}, like about ${Math.round(dist.zeroShare * 100)}% of ${peers}.`
+// which: 'all' | 'classC' (bench.all.* / bench.classC.* in the dictionary)
+function compareLine(dist, count, units, which, peers, t) {
+  if (count === 0) return t(`bench.${which}.zero`, { pct: t.pct(Math.round(dist.zeroShare * 100) / 100), peers })
   const { below, above } = position(dist, count / units)
   return below >= 50 || below >= above
-    ? `More ${what} per apartment than about ${below}% of ${peers}.`
-    : `Fewer ${what} per apartment than about ${above}% of ${peers}.`
+    ? t(`bench.${which}.more`, { pct: t.pct(below / 100), peers })
+    : t(`bench.${which}.fewer`, { pct: t.pct(above / 100), peers })
 }
 
 /**
  * Where this lot's open violations per apartment sit among same borough, same size group lots
  * in the committed snapshot. Returns { lines, basis, peers, below, ... } or { unavailable: reason }.
  */
-export function benchmarkFor(record) {
+export function benchmarkFor(record, t = EN) {
   const v = record?.violations
   const units = unitsFor(record)
   const borough = BENCHMARKS[record?.place?.boroId]
-  if (!v || v.error) return { unavailable: 'HPD violations didn’t load, so there’s nothing to compare.' }
-  if (record?.building?.error) return { unavailable: 'The apartment count (PLUTO) didn’t load, so there’s no borough comparison this time.' }
-  if (!units) return { unavailable: 'PLUTO has no apartment count for this tax lot, so there’s no borough comparison.' }
-  if (!borough) return { unavailable: 'No borough comparison is available for this address.' }
+  if (!v || v.error) return { unavailable: t('bench.noViolations') }
+  if (record?.building?.error) return { unavailable: t('bench.plutoError') }
+  if (!units) return { unavailable: t('bench.noUnits') }
+  if (!borough) return { unavailable: t('bench.noBorough') }
 
   const size = sizeGroup(units)
   const group = borough.groups[size]
-  const place = boroughPlace(borough.name)
-  const peers = size === 'apartments' ? `${borough.name} buildings with 3 or more apartments` : `${borough.name} homes with 1 or 2 apartments`
-  const all = compareLine(group.all, v.openTotal, units, { what: 'open violations', zeroWhat: 'open violations right now', peers })
-  const classC = compareLine(group.classC, v.openByClass.C, units, { what: 'open Class C violations', zeroWhat: 'open Class C violations', peers })
+  // Borough names are proper names and stay as they are.
+  const place = borough.name === 'Bronx' ? t('bench.theBronx') : borough.name
+  const peers = t(size === 'apartments' ? 'bench.peers.apartments' : 'bench.peers.homes', { borough: borough.name })
+  const all = compareLine(group.all, v.openTotal, units, 'all', peers, t)
+  const classC = compareLine(group.classC, v.openByClass.C, units, 'classC', peers, t)
 
   return {
     peers,
@@ -83,7 +87,7 @@ export function benchmarkFor(record) {
     rate: v.openTotal / units,
     below: v.openTotal ? position(group.all, v.openTotal / units).below : 0,
     lines: { all, classC },
-    basis: `Compared with buildings across ${place}. NYC Open Data snapshot, ${monthYear(benchmarksMeta.snapshotDate)}.`,
+    basis: t('bench.basis', { place, date: t.monthYear(benchmarksMeta.snapshotDate, 'long') }),
   }
 }
 
@@ -99,7 +103,7 @@ function monthsBack(now, n) {
  * building related 311 complaints. The current month is left out of the 12 month comparison
  * so a half finished month can't make things look calmer than they are.
  */
-export function trendFor(record, now = new Date()) {
+export function trendFor(record, now = new Date(), t = EN) {
   const vh = record?.violationHistory
   const ch = record?.complaintHistory
   const hasV = vh && !vh.error
@@ -131,12 +135,15 @@ export function trendFor(record, now = new Date()) {
     years.push({ year: y, violations: hasV ? inYear(vMonths) : null, complaints: hasC ? inYear(cMonths) : null, partial: y === thisYear })
   }
 
-  const counts = (p) => [hasV && plural(p.violations, 'HPD violation'), hasC && plural(p.complaints, 'building complaint') + ' to 311'].filter(Boolean).join(' and ')
-  const detail = `Last 12 full months: ${counts(last)}. The 12 months before: ${counts(prior)}.`
+  const counts = (p) => {
+    const parts = [hasV && t.count('hpdViolation', p.violations), hasC && t.count('buildingComplaint311', p.complaints)].filter(Boolean)
+    return parts.length === 2 ? t('trend.and', { a: parts[0], b: parts[1] }) : parts[0]
+  }
+  const detail = t('trend.detail', { last: counts(last), prior: counts(prior) })
 
   return {
     direction,
-    headline: TREND_HEADLINES[direction],
+    headline: t(`trend.${direction}`),
     detail,
     last,
     prior,
@@ -148,12 +155,6 @@ export function trendFor(record, now = new Date()) {
 }
 
 export const TREND = { up: 1.25, down: 0.8, minChange: 3, minReports: 10 }
-const TREND_HEADLINES = {
-  up: 'Reports are climbing',
-  down: 'Reports have eased over the last year',
-  flat: 'Reports are holding about steady',
-  quiet: 'Too few reports to call a trend',
-}
 
 // ---------------------------------------------------------------- fix rate
 
@@ -161,7 +162,7 @@ const TREND_HEADLINES = {
  * Record facts about how violations get closed: share of the last 5 years' violations marked
  * closed, median days from notice to close, and open violations issued more than a year ago.
  */
-export function fixRateFor(record, now = new Date()) {
+export function fixRateFor(record, now = new Date(), t = EN) {
   const vh = record?.violationHistory
   if (!vh || vh.error) return { unavailable: true }
 
@@ -178,12 +179,12 @@ export function fixRateFor(record, now = new Date()) {
   const sentences = []
   if (issued) {
     const share = Math.round((closed / issued) * 100)
-    sentences.push(`Of the ${plural(issued, 'violation')} issued in the last 5 years, ${share}% ${share === 1 ? 'is' : 'are'} marked closed.`)
-    if (median !== null) sentences.push(`The typical fix took about ${plural(median, 'day')}.`)
+    sentences.push(t('fix.share', { n: share, count: t.count('violation', issued), pct: t.pct(share / 100) }))
+    if (median !== null) sentences.push(t('fix.median', { count: t.count('day', median) }))
   } else {
-    sentences.push('No HPD violations were issued here in the last 5 years.')
+    sentences.push(t('fix.none'))
   }
-  if (openOverYear) sentences.push(`${plural(openOverYear, 'open violation')} ${openOverYear === 1 ? 'was' : 'were'} issued more than a year ago, the oldest in ${oldestOpenYear}.`)
+  if (openOverYear) sentences.push(t('fix.old', { n: openOverYear, count: t.count('openViolation', openOverYear), year: String(oldestOpenYear) }))
 
   return {
     issued,
@@ -200,12 +201,13 @@ export function fixRateFor(record, now = new Date()) {
 export const FIX = { minClosedForMedian: 3 }
 
 // Everything above in one object, for the results page, the AI summary and compare mode.
-export function computeInsights(record) {
+export function computeInsights(record, t = EN) {
+  const now = new Date()
   return {
     units: unitsFor(record),
-    factsLine: buildingFactsLine(record),
-    benchmark: benchmarkFor(record),
-    trend: trendFor(record),
-    fixRate: fixRateFor(record),
+    factsLine: buildingFactsLine(record, t),
+    benchmark: benchmarkFor(record, t),
+    trend: trendFor(record, now, t),
+    fixRate: fixRateFor(record, now, t),
   }
 }

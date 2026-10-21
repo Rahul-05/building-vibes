@@ -7,9 +7,11 @@ import AddressSearch from './components/AddressSearch.jsx'
 import LoadingView from './components/LoadingView.jsx'
 import Results from './components/Results.jsx'
 import StateMessage from './components/StateMessage.jsx'
+import LanguagePicker from './components/LanguagePicker.jsx'
 import { CompareTray, CompareView, MAX_PINNED } from './components/Compare.jsx'
 import { AddressNotFoundError, getBuildingRecord } from './data/index.js'
 import { prefersReducedMotion } from './lib/motion.js'
+import { useT } from './i18n/index.jsx'
 
 const EXAMPLES = ['1520 Sedgwick Ave, Bronx', '1 Union Sq S, Manhattan', '2 Gold St, Manhattan']
 
@@ -17,6 +19,7 @@ const EXAMPLES = ['1520 Sedgwick Ave, Bronx', '1 Union Sq S, Manhattan', '2 Gold
 // The compare tray and the comparison sit beside it: pinning survives new searches, and the
 // comparison overlays whatever view is open (kept mounted, so the AI story isn't refetched).
 export default function App() {
+  const t = useT()
   const [view, setView] = useState({ name: 'idle' })
   const [tray, setTray] = useState([]) // [{ bbl, record }], in app state only, never stored
   const [comparing, setComparing] = useState(false)
@@ -53,14 +56,14 @@ export default function App() {
       const record = await getBuildingRecord(input, { signal: controller.signal })
       if (controller.signal.aborted) return
       const bbl = record.place.bbl
-      if (tray.some((x) => x.bbl === bbl)) return setAdding({ status: 'error', message: `${record.place.name} is already in the tray.` })
+      if (tray.some((x) => x.bbl === bbl)) return setAdding({ status: 'error', message: t('app.alreadyInTray', { name: record.place.name }) })
       setTray((t) => (t.length >= MAX_PINNED || t.some((x) => x.bbl === bbl) ? t : [...t, { bbl, record }]))
       setAdding(null)
     } catch (err) {
       if (controller.signal.aborted) return
       setAdding({
         status: 'error',
-        message: err instanceof AddressNotFoundError ? `We couldn’t match ${label} to a NYC building. Try a house number and street.` : 'The city’s data didn’t load just now. Try again in a moment.',
+        message: err instanceof AddressNotFoundError ? t('app.compareNotFound', { label }) : t('app.dataError'),
       })
     }
   }
@@ -96,18 +99,23 @@ export default function App() {
 
   return (
     // Bottom padding clears the compare tray (it publishes its height) and the floating Ask button.
-    <div className="relative min-h-dvh" style={{ paddingBottom: `calc(var(--tray-space, 0px) + ${view.name === 'results' && !comparing ? '5.5rem' : '0px'})` }}>
+    // dir and lang follow the chosen language; RTL layouts lean on logical (start/end) classes.
+    <div dir={t.dir} lang={t.code} className="relative min-h-dvh" style={{ paddingBottom: `calc(var(--tray-space, 0px) + ${view.name === 'results' && !comparing ? '5.5rem' : '0px'})` }}>
       <Backdrop />
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <button type="button" onClick={reset} className="pop-sm press flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap bg-paper px-3 py-1.5 font-display text-lg font-extrabold">
           <span aria-hidden className="h-4 w-4 rounded-full border-2 border-ink bg-bubblegum" />
           Building Vibes
         </button>
-        {(view.name !== 'idle' || comparing) && (
-          <button type="button" onClick={reset} className="flex min-h-10 items-center gap-1 whitespace-nowrap px-1 text-sm font-bold underline decoration-2 underline-offset-4">
-            <ArrowLeft aria-hidden size={16} /> New search
-          </button>
-        )}
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          {(view.name !== 'idle' || comparing) && (
+            // Icon only on phones (the address box sits right below on results), so the header fits.
+            <button type="button" onClick={reset} aria-label={t('app.newSearch')} className="flex min-h-10 min-w-10 items-center justify-center gap-1 whitespace-nowrap px-1 text-sm font-bold underline decoration-2 underline-offset-4">
+              <ArrowLeft aria-hidden size={16} className="shrink-0 rtl:-scale-x-100" /> <span className="hidden sm:inline">{t('app.newSearch')}</span>
+            </button>
+          )}
+          <LanguagePicker />
+        </div>
       </header>
 
       {comparing && (
@@ -135,36 +143,50 @@ export default function App() {
         {view.name === 'notFound' && (
           <StateMessage
             mood="mixed"
-            title="Hmm, we couldn’t find that one"
+            title={t('app.notFoundTitle')}
             action={<div className="relative z-50 w-full max-w-xl"><AddressSearch onSearch={search} autoFocus /></div>}
           >
-            We couldn’t match “{String(view.query)}” to a NYC building. Try a house number and street, like “350 5th Ave, Manhattan”.
+            {t('app.notFoundBody', { query: typeof view.query === 'string' ? view.query : view.query?.label || '' })}
           </StateMessage>
         )}
         {view.name === 'error' && (
           <StateMessage
             mood="worried"
-            title="The city’s data is being shy"
+            title={t('app.errorTitle')}
             action={
               <button type="button" onClick={() => search(view.input)} className="pop press bg-sunny px-6 py-3 font-display text-lg font-bold">
-                Try again
+                {t('app.tryAgain')}
               </button>
             }
           >
-            {view.message || 'Something went wrong reaching NYC Open Data.'} Nothing is wrong on your end.
+            {t('app.errorBody')}
           </StateMessage>
         )}
       </main>
 
       <footer className="px-4 pb-8 text-center text-sm text-ink/60">
-        Free & open. No accounts, no tracking, nothing stored. Data from NYC Open Data.
+        {t('app.footer')}
       </footer>
       {!comparing && <CompareTray tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onClear={clearTray} onView={openCompare} />}
     </div>
   )
 }
 
+// "[What’s] the [vibe] of your next [building?]": bracketed words get the sticker highlight, in
+// order. Languages written without spaces keep their pieces touching.
+const HIGHLIGHTS = ['bg-sunny', 'bg-bubblegum', 'bg-sky text-cream']
+function headlineWords(text) {
+  const words = []
+  let marked = 0
+  for (const m of text.matchAll(/\[([^\]]+)\]|[^\s[]+/g)) {
+    const spaced = /\s/.test(text[m.index + m[0].length] || ' ')
+    words.push({ text: m[1] ?? m[0], cls: m[1] ? HIGHLIGHTS[marked++ % HIGHLIGHTS.length] : null, spaced })
+  }
+  return words
+}
+
 function Landing({ onSearch }) {
+  const t = useT()
   const root = useRef(null)
   // "I have a listing to check": the next address picked opens on the listing checker.
   const [withListing, setWithListing] = useState(false)
@@ -181,28 +203,20 @@ function Landing({ onSearch }) {
     return () => ctx.revert()
   }, [])
 
-  const words = [
-    ['What’s', 'bg-sunny'],
-    ['the', null],
-    ['vibe', 'bg-bubblegum'],
-    ['of', null],
-    ['your', null],
-    ['next', null],
-    ['building?', 'bg-sky text-cream'],
-  ]
+  const words = headlineWords(t('landing.headline'))
 
   return (
     <section ref={root} className="mx-auto grid w-full max-w-5xl items-center gap-6 px-4 pb-12 pt-4 sm:px-6 md:grid-cols-[1.4fr_1fr] md:pt-10">
       <div className="order-2 md:order-1">
         <h1 className="text-[2.6rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-          {words.map(([w, cls], i) => (
-            <span key={i} className={`word mr-[0.25em] inline-block ${cls ? `rounded-[0.4em] border-[3px] border-ink px-[0.2em] shadow-pop-sm ${cls} ${i % 2 ? 'rotate-2' : '-rotate-2'}` : ''}`}>
-              {w}
+          {words.map(({ text, cls, spaced }, i) => (
+            <span key={i} className={`word inline-block ${spaced ? 'me-[0.25em]' : cls ? 'mx-[0.08em]' : ''} ${cls ? `rounded-[0.4em] border-[3px] border-ink px-[0.2em] shadow-pop-sm ${cls} ${i % 2 ? 'rotate-2' : '-rotate-2'}` : ''}`}>
+              {text}
             </span>
           ))}
         </h1>
         <p className="fade-up mt-5 max-w-lg text-lg text-ink/80 sm:text-xl">
-          Type any NYC address. We pull the building’s public record (violations, 311 calls, building complaints, evictions) and turn it into flags in plain language.
+          {t('landing.intro')}
         </p>
         {/* fade-up leaves a transform (own stacking context), so lift this one above its siblings. */}
         <div className="fade-up relative z-50 mt-7">
@@ -213,29 +227,29 @@ function Landing({ onSearch }) {
             type="button"
             onClick={() => setWithListing((v) => !v)}
             aria-pressed={withListing}
-            className={`pop-sm press inline-flex min-h-10 items-center gap-1.5 px-3 py-1.5 text-left text-sm font-bold ${withListing ? 'bg-lilac' : 'bg-paper'}`}
+            className={`pop-sm press inline-flex min-h-10 items-center gap-1.5 px-3 py-1.5 text-start text-sm font-bold ${withListing ? 'bg-lilac' : 'bg-paper'}`}
           >
             <ClipboardList aria-hidden size={16} strokeWidth={2.5} className="shrink-0" />
-            {withListing ? 'Listing checker on: pick the address above' : 'I also have a rental listing to check'}
+            {withListing ? t('landing.listingOn') : t('landing.listingOff')}
           </button>
           {withListing && (
             <p className="mt-2 max-w-lg text-sm text-ink/70">
-              The building’s record opens with the listing checker ready. Paste the listing there to see its claims next to the record.
+              {t('landing.listingNote')}
             </p>
           )}
         </div>
         <div className="fade-up mt-4 flex flex-wrap items-center gap-2 text-sm">
-          <span className="flex items-center gap-1 font-bold"><Sparkles aria-hidden size={16} /> Try:</span>
+          <span className="flex items-center gap-1 font-bold"><Sparkles aria-hidden size={16} /> {t('landing.try')}</span>
           {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" onClick={() => go(ex)} className="min-h-10 whitespace-nowrap rounded-full border-2 border-ink bg-paper px-3 py-1 font-medium hover:bg-sunny">
+            <button key={ex} type="button" dir="ltr" onClick={() => go(ex)} className="min-h-10 whitespace-nowrap rounded-full border-2 border-ink bg-paper px-3 py-1 font-medium hover:bg-sunny">
               {ex}
             </button>
           ))}
         </div>
-        <p className="fade-up mt-6 text-sm font-bold">Based on public records, not advice. No login, nothing saved.</p>
+        <p className="fade-up mt-6 text-sm font-bold">{t('landing.disclaimer')}</p>
       </div>
       <div className="mascot-in order-1 flex justify-center overflow-visible py-4 md:order-2">
-        <Mascot mood="happy" className="h-52 w-52 sm:h-72 sm:w-72 md:h-80 md:w-80" title="Happy building mascot" />
+        <Mascot mood="happy" className="h-52 w-52 sm:h-72 sm:w-72 md:h-80 md:w-80" title={t('mascot.happy')} />
       </div>
     </section>
   )

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { prefersReducedMotion } from '../lib/motion.js'
+import { useT } from '../i18n/index.jsx'
 
 // "Vibe" — a calm line-art building. The face is strokes only (no filled eyes); every
 // mood-dependent path shares the same command structure (M x y Q cx cy x y), so GSAP can
@@ -58,6 +59,7 @@ export function MascotFace({ mood = 'happy', className = '' }) {
 }
 
 export default function Mascot({ mood = 'happy', className = '', title }) {
+  const t = useT()
   const root = useRef(null)
   const initial = useRef(MOODS[mood] || MOODS.happy).current
 
@@ -108,7 +110,7 @@ export default function Mascot({ mood = 'happy', className = '', title }) {
         viewBox="0 0 200 240"
         className="block h-full w-full overflow-visible"
         role="img"
-        aria-label={title || `Building mascot looking ${mood}`}
+        aria-label={title || t('mascot.vibe')}
       >
         <ellipse className="shadow" cx="100" cy="224" rx="56" ry="6" fill={INK} opacity="0.12" />
 

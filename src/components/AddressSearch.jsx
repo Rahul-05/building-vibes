@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { MapPin, Search } from 'lucide-react'
 import { suggestAddresses } from '../data/index.js'
+import { useT } from '../i18n/index.jsx'
 
 // One input, debounced GeoSearch suggestions, keyboard friendly.
 // onSearch receives either a resolved place (picked suggestion) or the raw text.
@@ -13,10 +14,11 @@ export default function AddressSearch({
   initialValue = '',
   dropUp = false,
   listMaxHeight,
-  placeholder = 'Type any NYC address…',
-  submitLabel = 'Check vibes',
+  placeholder,
+  submitLabel,
   disabled = false,
 }) {
+  const t = useT()
   const [text, setText] = useState(initialValue)
   const [suggestions, setSuggestions] = useState([])
   const [active, setActive] = useState(-1)
@@ -83,16 +85,17 @@ export default function AddressSearch({
 
   return (
     <form onSubmit={submit} role="search" className="relative z-50 w-full">
-      <label htmlFor={`${listId}-input`} className="sr-only">NYC address</label>
-      <div className={`pop flex items-center gap-2 bg-paper ${compact ? 'p-1.5 pl-4' : 'p-2 pl-5 sm:p-2.5 sm:pl-6'}`}>
+      <label htmlFor={`${listId}-input`} className="sr-only">{t('search.label')}</label>
+      <div className={`pop flex items-center gap-2 bg-paper ${compact ? 'p-1.5 ps-4' : 'p-2 ps-5 sm:p-2.5 sm:ps-6'}`}>
         <MapPin aria-hidden className="shrink-0 text-bubblegum" size={compact ? 20 : 26} strokeWidth={2.5} />
         <input
           id={`${listId}-input`}
           type="text"
+          dir="auto"
           inputMode="search"
           autoComplete="off"
           autoFocus={autoFocus}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t('search.placeholder')}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
@@ -107,10 +110,10 @@ export default function AddressSearch({
         <button
           type="submit"
           disabled={disabled}
-          className={`pop-sm press flex shrink-0 items-center gap-2 bg-ink font-display font-bold text-cream hover:bg-bubblegum hover:text-ink disabled:opacity-50 ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'whitespace-nowrap px-3.5 py-3 text-base sm:px-6 sm:text-lg'}`}
+          className={`pop-sm press flex shrink-0 items-center gap-2 bg-ink font-display font-bold text-cream hover:bg-bubblegum hover:text-ink disabled:opacity-50 ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'max-w-[9rem] px-3.5 py-3 text-center text-base leading-tight sm:max-w-none sm:whitespace-nowrap sm:px-6 sm:text-lg'}`}
         >
-          <Search aria-hidden size={compact ? 16 : 20} strokeWidth={3} />
-          <span className={compact ? 'sr-only sm:not-sr-only' : ''}>{submitLabel}</span>
+          <Search aria-hidden size={compact ? 16 : 20} strokeWidth={3} className="shrink-0" />
+          <span className={compact ? 'sr-only sm:not-sr-only' : ''}>{submitLabel ?? t('search.submit')}</span>
         </button>
       </div>
 
@@ -119,7 +122,7 @@ export default function AddressSearch({
           id={listId}
           role="listbox"
           style={listMaxHeight ? { maxHeight: listMaxHeight } : undefined}
-          className={`absolute inset-x-2 z-[60] max-h-80 overflow-y-auto overscroll-contain rounded-2xl ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'} border-[2.5px] border-ink bg-paper text-left shadow-pop-sm`}
+          className={`absolute inset-x-2 z-[60] max-h-80 overflow-y-auto overscroll-contain rounded-2xl ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'} border-[2.5px] border-ink bg-paper text-start shadow-pop-sm`}
         >
           {suggestions.map((s, i) => (
             <li
@@ -133,7 +136,7 @@ export default function AddressSearch({
             >
               <MapPin aria-hidden size={16} className="shrink-0" />
               <span className="min-w-0 font-medium">{s.name}</span>
-              <span className="ml-auto shrink-0 text-sm text-ink/60">{s.borough}</span>
+              <span className="ms-auto shrink-0 text-sm text-ink/60">{s.borough}</span>
             </li>
           ))}
         </ul>

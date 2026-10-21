@@ -5,9 +5,9 @@ import AddressSearch from './AddressSearch.jsx'
 import Disclaimer from './Disclaimer.jsx'
 import { FlagDot } from './FlagSummary.jsx'
 import { TREND_ICONS } from './Context.jsx'
-import { MOOD_COPY, scoreRecord } from '../lib/scoring.js'
+import { moodLabel, scoreRecord } from '../lib/scoring.js'
 import { computeInsights, ratePhrase } from '../lib/insights.js'
-import { formatDate, plural } from '../lib/plainLanguage.js'
+import { useT } from '../i18n/index.jsx'
 
 // Phase 4 compare mode. The tray lives in App state only (no storage). The comparison is a
 // plain side by side table: no winner, no ranking, the visitor reads the numbers.
@@ -39,7 +39,8 @@ function useVisualViewport() {
 // Search to add a building without leaving the tray or the comparison. Remounted (key) after
 // each add so the box clears; a failed add keeps the typed text.
 function CompareAdd({ count, adding, onAdd, dropUp, listMaxHeight }) {
-  if (count >= MAX_PINNED) return <p className="text-sm font-medium text-ink/70">The tray holds {MAX_PINNED} buildings. Remove one to add another.</p>
+  const t = useT()
+  if (count >= MAX_PINNED) return <p className="text-sm font-medium text-ink/70">{t('compare.trayFull', { max: MAX_PINNED })}</p>
   const loading = adding?.status === 'loading'
   return (
     <div className="min-w-0">
@@ -50,11 +51,11 @@ function CompareAdd({ count, adding, onAdd, dropUp, listMaxHeight }) {
         dropUp={dropUp}
         listMaxHeight={listMaxHeight}
         disabled={loading}
-        placeholder={count === 1 ? 'Add a second building…' : 'Add another building…'}
-        submitLabel="Add"
+        placeholder={count === 1 ? t('compare.addSecond') : t('compare.addAnother')}
+        submitLabel={t('compare.add')}
       />
       <p aria-live="polite" className={`px-2 text-sm font-medium empty:hidden ${adding?.status === 'error' ? 'mt-2 text-ink' : 'mt-2 text-ink/70'}`}>
-        {loading && `Looking up ${adding.label}…`}
+        {loading && t('compare.lookingUp', { label: adding.label })}
         {adding?.status === 'error' && adding.message}
       </p>
     </div>
@@ -62,6 +63,7 @@ function CompareAdd({ count, adding, onAdd, dropUp, listMaxHeight }) {
 }
 
 export function CompareTray({ tray, adding, onAdd, onRemove, onClear, onView }) {
+  const t = useT()
   const ref = useRef(null)
   const [height, setHeight] = useState(0)
   const vp = useVisualViewport()
@@ -89,7 +91,7 @@ export function CompareTray({ tray, adding, onAdd, onRemove, onClear, onView }) 
   return (
     <aside
       ref={ref}
-      aria-label="Compare tray"
+      aria-label={t('compare.trayLabel')}
       style={vp.inset ? { bottom: vp.inset } : undefined}
       className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5"
     >
@@ -98,24 +100,24 @@ export function CompareTray({ tray, adding, onAdd, onRemove, onClear, onView }) 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <ul className="flex min-w-0 flex-1 flex-wrap gap-2">
             {tray.map(({ bbl, record }) => (
-              <li key={bbl} className="flex min-w-0 max-w-full items-center gap-1 rounded-full border-2 border-ink bg-lilac py-0.5 pl-3 pr-1 text-sm font-bold">
+              <li key={bbl} className="flex min-w-0 max-w-full items-center gap-1 rounded-full border-2 border-ink bg-lilac py-0.5 ps-3 pe-1 text-sm font-bold">
                 <span className="truncate">{record.place.name}</span>
                 {/* 40px tap target; the negative margin keeps the pill itself slim. */}
-                <button type="button" onClick={() => onRemove(bbl)} aria-label={`Remove ${record.place.name} from compare`} className="-my-2 grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-ink/10">
+                <button type="button" onClick={() => onRemove(bbl)} aria-label={t('compare.remove', { name: record.place.name })} className="-my-2 grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-ink/10">
                   <X aria-hidden size={14} strokeWidth={3} />
                 </button>
               </li>
             ))}
           </ul>
           <div className="flex shrink-0 items-center justify-end gap-2">
-            <button type="button" onClick={onClear} className="min-h-10 px-2 text-sm font-bold underline decoration-2 underline-offset-4">Clear</button>
+            <button type="button" onClick={onClear} className="min-h-10 px-2 text-sm font-bold underline decoration-2 underline-offset-4">{t('compare.clear')}</button>
             <button
               type="button"
               onClick={onView}
               disabled={tray.length < 2}
               className="pop-sm press inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap bg-sunny px-4 py-2 font-display font-bold disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <GitCompareArrows aria-hidden size={18} strokeWidth={2.5} /> View comparison
+              <GitCompareArrows aria-hidden size={18} strokeWidth={2.5} /> {t('compare.view')}
             </button>
           </div>
         </div>
@@ -126,137 +128,139 @@ export function CompareTray({ tray, adding, onAdd, onRemove, onClear, onView }) 
 
 // ---------------------------------------------------------------- comparison rows
 
-const NA = 'Didn’t load'
-const money = (n) => `$${Math.round(n).toLocaleString()}`
+const money = (n, t) => `$${t.num(Math.round(n))}`
 const year = (iso) => (iso ? iso.slice(0, 4) : '')
 
+// Each row: compare.row.<key> label, cell(entry, t). Owner names and dates' city text stay as is.
 const ROWS = [
   {
-    label: 'Flags',
-    cell: ({ scored }) => (
+    key: 'flags',
+    cell: ({ scored }, t) => (
       <span className="flex flex-wrap gap-x-3 gap-y-1">
         {['red', 'yellow', 'green'].map((l) => (
           <span key={l} className="inline-flex items-center gap-1 whitespace-nowrap font-bold">
-            <FlagDot level={l} /> {scored.counts[l]} {l}
+            <FlagDot level={l} /> {t.num(scored.counts[l])} {t(`level.${l}`)}
           </span>
         ))}
       </span>
     ),
   },
-  { label: 'Built and apartments', cell: ({ insights }) => insights.factsLine || 'Not in PLUTO' },
+  { key: 'facts', cell: ({ insights }, t) => insights.factsLine || t('compare.notInPluto') },
   {
-    label: 'Open violations',
-    cell: ({ record, insights }) => {
+    key: 'open',
+    cell: ({ record, insights }, t) => {
       const v = record.violations
-      if (!v || v.error) return NA
-      const rate = insights.units && v.openTotal ? ratePhrase(v.openTotal, insights.units) : ''
-      return `${v.openTotal.toLocaleString()} open (${v.openByClass.C.toLocaleString()} Class C)${rate ? `, ${rate}` : ''}`
+      if (!v || v.error) return t('compare.na')
+      const rate = insights.units && v.openTotal ? ratePhrase(v.openTotal, insights.units, t) : ''
+      const text = t('compare.openCell', { open: v.openTotal, c: v.openByClass.C })
+      return rate ? t('rate.with', { text, rate }) : text
     },
   },
   {
-    label: 'Open violations per apartment',
-    cell: ({ record, insights }) => {
+    key: 'perApt',
+    cell: ({ record, insights }, t) => {
       const v = record.violations
-      if (!v || v.error) return NA
-      return insights.units ? (Math.round((v.openTotal / insights.units) * 100) / 100).toLocaleString() : 'No apartment count'
+      if (!v || v.error) return t('compare.na')
+      return insights.units ? t.num(Math.round((v.openTotal / insights.units) * 100) / 100) : t('compare.noUnitCount')
     },
   },
-  { label: 'How it compares', cell: ({ insights }) => insights.benchmark.unavailable || insights.benchmark.lines.all },
+  { key: 'compares', cell: ({ insights }) => insights.benchmark.unavailable || insights.benchmark.lines.all },
   {
-    label: 'Trend',
-    cell: ({ insights }) => {
-      const t = insights.trend
-      if (t.unavailable) return NA
-      const Icon = TREND_ICONS[t.direction] || Minus
+    key: 'trend',
+    cell: ({ insights }, t) => {
+      const tr = insights.trend
+      if (tr.unavailable) return t('compare.na')
+      const Icon = TREND_ICONS[tr.direction] || Minus
       return (
         <span>
           <span className="flex items-start gap-1 font-bold">
-            <Icon aria-hidden size={16} strokeWidth={2.75} className="mt-0.5 shrink-0" /> <span className="min-w-0">{t.headline}</span>
+            <Icon aria-hidden size={16} strokeWidth={2.75} className="mt-0.5 shrink-0" /> <span className="min-w-0">{tr.headline}</span>
           </span>
-          <span className="block text-xs text-ink/60">{plural(t.lastTotal, 'report')} in the last 12 full months, {t.priorTotal.toLocaleString()} the 12 before</span>
+          <span className="block text-xs text-ink/60">{t('compare.trendCell', { count: t.count('report', tr.lastTotal), prior: tr.priorTotal })}</span>
         </span>
       )
     },
   },
   {
-    label: 'Fix rate',
-    cell: ({ insights }) => {
+    key: 'fix',
+    cell: ({ insights }, t) => {
       const f = insights.fixRate
-      if (f.unavailable) return NA
-      if (!f.issued) return 'No violations issued in 5 years'
+      if (f.unavailable) return t('compare.na')
+      if (!f.issued) return t('compare.fixNone')
       return [
-        `${Math.round(f.closedShare * 100)}% of ${f.issued.toLocaleString()} closed`,
-        f.medianDays !== null && `typical fix about ${plural(f.medianDays, 'day')}`,
-        f.openOverYear > 0 && `${f.openOverYear.toLocaleString()} open more than a year`,
+        t('compare.fixClosed', { pct: t.pct(Math.round(f.closedShare * 100) / 100), total: f.issued }),
+        f.medianDays !== null && t('compare.fixTypical', { count: t.count('day', f.medianDays) }),
+        f.openOverYear > 0 && t('compare.fixOld', { n: f.openOverYear }),
       ].filter(Boolean).join(' · ')
     },
   },
   {
-    label: 'City lists',
-    cell: ({ record }) => {
+    key: 'lists',
+    cell: ({ record }, t) => {
       const { aep, vacateOrders: vac } = record
       const parts = []
-      if (aep?.error) parts.push('AEP list didn’t load')
-      else if (aep?.active) parts.push('On the AEP list now')
-      else if (aep?.listings?.length) parts.push(`Was on the AEP list (${year(aep.listings[0].startDate)})`)
-      if (vac?.error) parts.push('Vacate orders didn’t load')
-      else if (vac?.inEffect) parts.push(`${plural(vac.inEffect, 'vacate order')} not lifted`)
-      else if (vac?.orders?.length) parts.push(`${plural(vac.orders.length, 'past vacate order')}, lifted`)
-      return parts.join(' · ') || 'Not on the AEP list, no vacate orders'
+      if (aep?.error) parts.push(t('compare.aepFailed'))
+      else if (aep?.active) parts.push(t('compare.aepNow'))
+      else if (aep?.listings?.length) parts.push(t('compare.aepWas', { year: year(aep.listings[0].startDate) }))
+      if (vac?.error) parts.push(t('compare.vacateFailed'))
+      else if (vac?.inEffect) parts.push(t('compare.vacateNotLifted', { count: t.count('vacateOrder', vac.inEffect) }))
+      else if (vac?.orders?.length) parts.push(t('compare.vacatePast', { count: t.count('pastVacateOrder', vac.orders.length) }))
+      return parts.join(' · ') || t('compare.listsNone')
     },
   },
   {
-    label: 'Court cases',
-    cell: ({ record }) => {
+    key: 'court',
+    cell: ({ record }, t) => {
       const l = record.litigations
-      if (!l || l.error) return NA
+      if (!l || l.error) return t('compare.na')
       return [
-        `${plural(l.recentTotal, 'case')} in 5 years`,
-        l.open > 0 && `${l.open} pending`,
-        l.recentHarassmentFindings > 0 && `${plural(l.recentHarassmentFindings, 'harassment finding')}`,
+        t('compare.courtCell', { count: t.count('case', l.recentTotal) }),
+        l.open > 0 && t('compare.pending', { n: l.open }),
+        l.recentHarassmentFindings > 0 && t.count('harassmentFinding', l.recentHarassmentFindings),
       ].filter(Boolean).join(' · ')
     },
   },
   {
-    label: 'Bedbugs',
-    cell: ({ record }) => {
+    key: 'bedbugs',
+    cell: ({ record }, t) => {
       const b = record.bedbugs
-      if (!b || b.error) return NA
-      if (!b.latest) return 'No filing found'
-      return `${b.latest.infested} of ${plural(b.latest.units, 'apartment')} infested (filing for ${year(b.latest.periodEnd)})`
+      if (!b || b.error) return t('compare.na')
+      if (!b.latest) return t('compare.bedbugsNone')
+      return t('compare.bedbugsCell', { infested: b.latest.infested, count: t.count('apartment', b.latest.units), year: year(b.latest.periodEnd) })
     },
   },
   {
-    label: 'Owner',
-    cell: ({ record }) => {
+    key: 'owner',
+    cell: ({ record }, t) => {
       const o = record.ownership
-      if (o?.error) return NA
-      return o?.owners?.length ? o.owners.join(', ') : 'No HPD registration matched'
+      if (o?.error) return t('compare.na')
+      return o?.owners?.length ? o.owners.join(', ') : t('compare.ownerNone')
     },
   },
   {
-    label: 'Last sale',
-    cell: ({ record }) => {
+    key: 'sale',
+    cell: ({ record }, t) => {
       const s = record.lastSale
-      if (s?.error) return NA
-      if (!s?.lastDeed) return 'No deed found for this tax lot'
+      if (s?.error) return t('compare.na')
+      if (!s?.lastDeed) return t('compare.saleNone')
       const d = s.lastPricedSale && !(s.lastDeed.amount > 0) ? s.lastPricedSale : s.lastDeed
-      return `${formatDate(d.date)} · ${d.amount > 0 ? money(d.amount) : 'no price recorded'}`
+      return `${t.date(d.date)} · ${d.amount > 0 ? money(d.amount, t) : t('compare.noPrice')}`
     },
   },
 ]
 
 function Head({ entry, onRemove }) {
+  const t = useT()
   const { record, scored } = entry
   return (
     <div className="flex items-center gap-3">
-      <Mascot mood={scored.mood} className="h-16 w-16 shrink-0" title={`Mascot mood: ${MOOD_COPY[scored.mood].label}`} />
-      <div className="min-w-0 flex-1 text-left">
+      <Mascot mood={scored.mood} className="h-16 w-16 shrink-0" title={t('mascot.mood', { label: moodLabel(scored.mood, t) })} />
+      <div className="min-w-0 flex-1 text-start">
         <p className="font-display text-lg font-extrabold leading-tight wrap-anywhere">{record.place.name}</p>
         <p className="text-xs font-bold uppercase tracking-wide text-ink/60">{record.place.borough}</p>
-        <p className="text-sm font-medium">{MOOD_COPY[scored.mood].label}</p>
+        <p className="text-sm font-medium">{moodLabel(scored.mood, t)}</p>
       </div>
-      <button type="button" onClick={() => onRemove(record.place.bbl)} aria-label={`Remove ${record.place.name} from compare`} className="grid h-10 w-10 shrink-0 place-items-center self-start rounded-full border-2 border-ink bg-paper hover:bg-ink/10">
+      <button type="button" onClick={() => onRemove(record.place.bbl)} aria-label={t('compare.remove', { name: record.place.name })} className="grid h-10 w-10 shrink-0 place-items-center self-start rounded-full border-2 border-ink bg-paper hover:bg-ink/10">
         <X aria-hidden size={16} strokeWidth={3} />
       </button>
     </div>
@@ -264,38 +268,39 @@ function Head({ entry, onRemove }) {
 }
 
 export function CompareView({ tray, adding, onAdd, onRemove, onBack }) {
+  const t = useT()
   const entries = useMemo(
-    () => tray.map(({ record }) => ({ record, scored: scoreRecord(record), insights: computeInsights(record) })),
-    [tray],
+    () => tray.map(({ record }) => ({ record, scored: scoreRecord(record, t), insights: computeInsights(record, t) })),
+    [tray, t],
   )
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 pb-16 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-3xl font-extrabold sm:text-4xl">
-          <GitCompareArrows aria-hidden size={32} strokeWidth={2.75} /> Side by side
+          <GitCompareArrows aria-hidden size={32} strokeWidth={2.75} /> {t('compare.heading')}
         </h1>
         <button type="button" onClick={onBack} className="pop-sm press inline-flex min-h-10 items-center gap-1 bg-paper px-3 py-1.5 text-sm font-bold">
-          <ArrowLeft aria-hidden size={16} /> Back
+          <ArrowLeft aria-hidden size={16} className="rtl:-scale-x-100" /> {t('compare.back')}
         </button>
       </div>
-      <p className="text-ink/75">The same public record facts for each building, in the order you pinned them. No winner here: read the numbers and decide for yourself.</p>
+      <p className="text-ink/75">{t('compare.intro')}</p>
       {/* Positioned + z-50 so the suggestions list stacks over the table below. */}
       <div className="relative z-50 max-w-xl">
         <CompareAdd count={tray.length} adding={adding} onAdd={onAdd} />
       </div>
 
       {entries.length === 0 ? (
-        <p className="pop bg-paper p-6 font-medium">Nothing pinned yet. Add an address above, or look up a building and press “Compare this building”.</p>
+        <p className="pop bg-paper p-6 font-medium">{t('compare.empty')}</p>
       ) : (
         <>
           {/* Wide screens: one column per building. */}
           <div className="pop hidden overflow-x-auto bg-paper md:block">
             <table className="w-full table-fixed border-collapse text-sm">
-              <caption className="sr-only">Public record facts for the pinned buildings, side by side</caption>
+              <caption className="sr-only">{t('compare.caption')}</caption>
               <thead>
                 <tr>
-                  <th scope="col" className="w-40 p-4 text-left align-bottom text-xs uppercase tracking-wide text-ink/55">Building</th>
+                  <th scope="col" className="w-40 p-4 text-start align-bottom text-xs uppercase tracking-wide text-ink/55">{t('compare.building')}</th>
                   {entries.map((e) => (
                     <th key={e.record.place.bbl} scope="col" className="p-4 align-top font-normal">
                       <Head entry={e} onRemove={onRemove} />
@@ -305,10 +310,10 @@ export function CompareView({ tray, adding, onAdd, onRemove, onBack }) {
               </thead>
               <tbody>
                 {ROWS.map((row) => (
-                  <tr key={row.label} className="border-t-2 border-dashed border-ink/15">
-                    <th scope="row" className="p-4 text-left align-top font-bold">{row.label}</th>
+                  <tr key={row.key} className="border-t-2 border-dashed border-ink/15">
+                    <th scope="row" className="p-4 text-start align-top font-bold">{t(`compare.row.${row.key}`)}</th>
                     {entries.map((e) => (
-                      <td key={e.record.place.bbl} className="p-4 align-top wrap-anywhere">{row.cell(e)}</td>
+                      <td key={e.record.place.bbl} className="p-4 align-top wrap-anywhere">{row.cell(e, t)}</td>
                     ))}
                   </tr>
                 ))}
@@ -323,22 +328,22 @@ export function CompareView({ tray, adding, onAdd, onRemove, onBack }) {
                 <Head entry={e} onRemove={onRemove} />
                 <dl className="mt-3 divide-y-2 divide-dashed divide-ink/15 text-sm">
                   {ROWS.map((row) => (
-                    <div key={row.label} className="py-2">
-                      <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">{row.label}</dt>
-                      <dd className="mt-0.5 wrap-anywhere">{row.cell(e)}</dd>
+                    <div key={row.key} className="py-2">
+                      <dt className="text-xs font-bold uppercase tracking-wide text-ink/55">{t(`compare.row.${row.key}`)}</dt>
+                      <dd className="mt-0.5 wrap-anywhere">{row.cell(e, t)}</dd>
                     </div>
                   ))}
                 </dl>
               </article>
             ))}
           </div>
-          {entries.length === 1 && <p className="text-sm text-ink/70">Only one building is pinned. Add another address above to see them side by side.</p>}
+          {entries.length === 1 && <p className="text-sm text-ink/70">{t('compare.onlyOne')}</p>}
         </>
       )}
 
       <div className="text-center">
         <Disclaimer />
-        <p className="mt-3 text-sm text-ink/60">Each building’s record was fetched when you looked it up. Counts cover the whole tax lot.</p>
+        <p className="mt-3 text-sm text-ink/60">{t('compare.footnote')}</p>
       </div>
     </div>
   )

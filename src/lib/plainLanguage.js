@@ -1,3 +1,5 @@
+import { EN } from '../i18n/translator.js'
+
 // Minimal translation of city-speak into readable text. Deliberately conservative:
 // strip legal citations, soften a few stock phrases, sentence-case. No reinterpretation.
 
@@ -83,29 +85,11 @@ export function groupViolations(items) {
   return [...groups.values()]
 }
 
-// 311 complaint types → friendlier labels. Unknown types just get sentence-cased.
-const COMPLAINT_LABELS = {
-  'HEAT/HOT WATER': 'Heat or hot water',
-  'UNSANITARY CONDITION': 'Unsanitary conditions (often pests, mold, or garbage)',
-  PLUMBING: 'Plumbing',
-  'PAINT/PLASTER': 'Paint or plaster',
-  'DOOR/WINDOW': 'Doors or windows',
-  'FLOORING/STAIRS': 'Floors or stairs',
-  'WATER LEAK': 'Water leaks',
-  ELECTRIC: 'Electrical',
-  APPLIANCE: 'Appliances',
-  GENERAL: 'General building upkeep',
-  SAFETY: 'Safety',
-  'OUTSIDE BUILDING': 'Outside of the building',
-  ELEVATOR: 'Elevator',
-  Elevator: 'Elevator',
-  Rodent: 'Rodents',
-  'Indoor Air Quality': 'Indoor air quality',
-  'Construction Lead Dust': 'Construction lead dust',
-}
-
-export function plainComplaintType(type) {
-  return COMPLAINT_LABELS[type] || sentenceCase(type.replace(/\//g, ' / '))
+// 311 complaint types → friendlier labels (complaintType.* in the dictionary). Unknown types are
+// city text, so they just get sentence-cased and stay as published.
+export function plainComplaintType(type, t = EN) {
+  const key = `complaintType.${type}`
+  return t.has(key) ? t(key) : sentenceCase(type.replace(/\//g, ' / '))
 }
 
 // HPD-routed housing complaints are uppercase in the 311 data; these are the
@@ -120,12 +104,11 @@ export function isHousingComplaint(type) {
   return type === type.toUpperCase() || HOUSING_MIXED_CASE.has(type)
 }
 
-export function formatDate(iso) {
-  if (!iso) return ''
-  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+export function formatDate(iso, t = EN) {
+  return t.date(iso)
 }
 
+// English only (the AI summary); the UI uses t.count() so each language gets its own plurals.
 export function plural(n, one, many = `${one}s`) {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`
 }
