@@ -1,4 +1,4 @@
-// Calls to the Building Vibes AI Worker. It only ever receives the compact summary
+// Calls to the NYC Rent Hub AI Worker. It only ever receives the compact summary
 // built in src/lib/summary.js, never raw records or anything about the user. The listing
 // checker also sends the listing text the visitor pasted, which is never stored anywhere.
 import { AI_ASK_TIMEOUT_MS, AI_CHECK_TIMEOUT_MS, AI_STORY_TIMEOUT_MS, WORKER_URL } from './config.js'

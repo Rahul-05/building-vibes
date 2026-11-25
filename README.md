@@ -1,6 +1,12 @@
-# Building Vibes
+# NYC Rent Hub
 
-A free, public-interest web tool for NYC renters. Type any NYC address and you get that building's public record (housing violations, 311 complaints, Department of Buildings complaints, evictions) in plain language, sorted into **green / yellow / red flags**. A building-blob mascot's mood reflects the record.
+A free, public-interest web tool for NYC renters, and one stop for NYC rent and building questions. It has three tools:
+
+- **Building Story:** type any NYC address and you get that building's public record (housing violations, 311 complaints, Department of Buildings complaints, evictions) in plain language, sorted into **green / yellow / red flags**. A building-blob mascot's mood reflects the record.
+- **FARE Act checker:** answer a few questions about a broker fee and see how it lines up with the law.
+- **Freeze My Rent:** a four question check on the NYC Rent Freeze Program (SCRIE/DRIE), plus a savings estimate, a document checklist, and a renewal explainer.
+
+The product name lives in one constant, `APP_NAME` in `src/lib/brand.js`. The site was formerly called Building Vibes; the GitHub repo name and the `/building-vibes/` URL path are unchanged.
 
 **Based on public records, not advice.** The tool shows what the city has on file. It doesn't tell anyone whether to rent.
 
@@ -51,6 +57,9 @@ address text ──► NYC GeoSearch ──► BBL + BIN
 | `src/lib/scoring.js` | Transparent flag rules + mood. The same rule text is shown in the UI under "How we pick flags". |
 | `src/lib/plainLanguage.js` | Strips legal citations from HPD text, sentence-cases it, labels 311 types. |
 | `src/lib/questions.js` | Question templates keyed by flag id. |
+| `src/lib/brand.js` | The product name (`APP_NAME`), in exactly one place. Swap the constant to rename the site. |
+| `src/lib/freeze.js` | Freeze My Rent assessment: rule based, deterministic, no AI call. Pattern match only, never a verdict. |
+| `src/components/FreezeCheck.jsx` | Freeze My Rent: four question quiz, savings estimate, document checklist, renewal explainer. |
 | `src/components/` | Mascot, search, loading, results sections, vibe card, confetti, backdrop. |
 
 ## Datasets (schemas verified 2026-10-20)

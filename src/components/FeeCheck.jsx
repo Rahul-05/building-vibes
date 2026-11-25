@@ -19,10 +19,12 @@ const CHOICES = {
 }
 const EMPTY = { signed: null, hired: null, extra: null, charges: [{ label: '', amount: '' }], paper: null, rent: '' }
 
-// Official pages only (checked Oct 21, 2026); the label and blurb for each are fare.route.<id>.*.
+// Official pages only (checked Oct 21, 2026; DOS link rechecked Nov 25, 2026 after the
+// old /file-complaint-against-licensee URL went 404: the live complaint form is the
+// Preliminary Statement of Complaint, DOS-1507-f). The label and blurb for each are fare.route.<id>.*.
 export const ROUTES = [
   { id: 'dcwp', href: 'https://www.nyc.gov/site/dca/consumers/file-complaint.page' },
-  { id: 'dos', href: 'https://dos.ny.gov/file-complaint-against-licensee' },
+  { id: 'dos', href: 'https://dos.ny.gov/preliminary-statement-complaint-1' },
   { id: 'court', href: 'https://www.nycourts.gov/courts/nyc/smallclaims/index.shtml' },
 ]
 

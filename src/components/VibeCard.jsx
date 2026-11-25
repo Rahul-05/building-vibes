@@ -1,5 +1,6 @@
 import Mascot from './Mascot.jsx'
 import { moodLabel } from '../lib/scoring.js'
+import { APP_NAME } from '../lib/brand.js'
 import { useT } from '../i18n/index.jsx'
 
 // Contrasting backgrounds so the mascot (whose body color tracks mood) always pops.
@@ -18,7 +19,7 @@ export default function VibeCard({ place, mood, counts }) {
           <div className="absolute -bottom-8 -left-6 h-24 w-24 rotate-12 rounded-[30%] border-[3px] border-ink bg-mint/70" />
         </div>
 
-        <p className="relative font-display text-sm font-extrabold uppercase tracking-[0.2em]">Building Vibes</p>
+        <p className="relative font-display text-sm font-extrabold uppercase tracking-[0.2em]">{APP_NAME}</p>
         <div className="relative mt-2 flex items-center gap-3">
           <div className="shrink-0 overflow-visible py-1">
             <Mascot mood={mood} className="h-24 w-24 sm:h-28 sm:w-28" />

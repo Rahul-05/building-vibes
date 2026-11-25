@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { ArrowLeft, ArrowRight, ClipboardList, ReceiptText, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, ClipboardList, ReceiptText, Snowflake, Sparkles } from 'lucide-react'
 import Backdrop from './components/Backdrop.jsx'
+import BrandMark from './components/BrandMark.jsx'
 import Mascot from './components/Mascot.jsx'
 import AddressSearch from './components/AddressSearch.jsx'
 import LoadingView from './components/LoadingView.jsx'
@@ -9,6 +10,8 @@ import Results from './components/Results.jsx'
 import StateMessage from './components/StateMessage.jsx'
 import LanguagePicker from './components/LanguagePicker.jsx'
 import FeeCheck from './components/FeeCheck.jsx'
+import FreezeCheck from './components/FreezeCheck.jsx'
+import { APP_NAME } from './lib/brand.js'
 import { CompareTray, CompareView, MAX_PINNED } from './components/Compare.jsx'
 import { AddressNotFoundError, getBuildingRecord } from './data/index.js'
 import { prefersReducedMotion } from './lib/motion.js'
@@ -27,6 +30,8 @@ export default function App() {
   // The broker fee checker overlays whatever view is open, like the comparison, so closing it
   // returns to the landing page or the building it was opened from.
   const [checkingFee, setCheckingFee] = useState(false)
+  // Same overlay pattern for the rent freeze checker.
+  const [freezing, setFreezing] = useState(false)
   const [adding, setAdding] = useState(null) // compare search: { status: 'loading', label } | { status: 'error', message }
   const requestRef = useRef(null)
   const addRef = useRef(null)
@@ -73,6 +78,7 @@ export default function App() {
   }
   const openFeeCheck = () => {
     setComparing(false)
+    setFreezing(false)
     setCheckingFee(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -80,8 +86,19 @@ export default function App() {
     setCheckingFee(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+  const openFreeze = () => {
+    setComparing(false)
+    setCheckingFee(false)
+    setFreezing(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const closeFreeze = () => {
+    setFreezing(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
   const openCompare = () => {
     setCheckingFee(false)
+    setFreezing(false)
     setComparing(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -90,6 +107,7 @@ export default function App() {
   async function search(input, { startWith } = {}) {
     setComparing(false)
     setCheckingFee(false)
+    setFreezing(false)
     requestRef.current?.abort()
     const controller = new AbortController()
     requestRef.current = controller
@@ -109,6 +127,7 @@ export default function App() {
   const reset = () => {
     setComparing(false)
     setCheckingFee(false)
+    setFreezing(false)
     requestRef.current?.abort()
     setView({ name: 'idle' })
   }
@@ -116,15 +135,15 @@ export default function App() {
   return (
     // Bottom padding clears the compare tray (it publishes its height) and the floating Ask button.
     // dir and lang follow the chosen language; RTL layouts lean on logical (start/end) classes.
-    <div dir={t.dir} lang={t.code} className="relative min-h-dvh" style={{ paddingBottom: `calc(var(--tray-space, 0px) + ${view.name === 'results' && !comparing && !checkingFee ? '5.5rem' : '0px'})` }}>
+    <div dir={t.dir} lang={t.code} className="relative min-h-dvh" style={{ paddingBottom: `calc(var(--tray-space, 0px) + ${view.name === 'results' && !comparing && !checkingFee && !freezing ? '5.5rem' : '0px'})` }}>
       <Backdrop />
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <button type="button" onClick={reset} className="pop-sm press flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap bg-paper px-3 py-1.5 font-display text-lg font-extrabold">
-          <span aria-hidden className="h-4 w-4 rounded-full border-2 border-ink bg-bubblegum" />
-          Building Vibes
+          <BrandMark className="h-7 w-7" />
+          {APP_NAME}
         </button>
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          {(view.name !== 'idle' || comparing || checkingFee) && (
+          {(view.name !== 'idle' || comparing || checkingFee || freezing) && (
             // Icon only on phones (the address box sits right below on results), so the header fits.
             <button type="button" onClick={reset} aria-label={t('app.newSearch')} className="flex min-h-10 min-w-10 items-center justify-center gap-1 whitespace-nowrap px-1 text-sm font-bold underline decoration-2 underline-offset-4">
               <ArrowLeft aria-hidden size={16} className="shrink-0 rtl:-scale-x-100" /> <span className="hidden sm:inline">{t('app.newSearch')}</span>
@@ -133,6 +152,22 @@ export default function App() {
           <LanguagePicker />
         </div>
       </header>
+
+      {/* Hub menu: the three tools, one stop. Three equal buttons that fit a 360px
+          phone (short labels, small text under sm), active tool in sunny. */}
+      <nav aria-label={t('menu.label')} className="mx-auto w-full max-w-5xl px-4 pb-2 sm:px-6">
+        <div className="flex gap-2">
+          <button type="button" onClick={reset} aria-current={!comparing && !checkingFee && !freezing ? 'page' : undefined} className={`pop-sm press flex min-h-11 flex-1 items-center justify-center gap-1 px-1 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${!comparing && !checkingFee && !freezing ? 'bg-sunny' : 'bg-paper'}`}>
+            <Building2 aria-hidden size={16} strokeWidth={2.5} className="hidden shrink-0 min-[400px]:block" /> {t('menu.story')}
+          </button>
+          <button type="button" onClick={openFeeCheck} aria-current={checkingFee ? 'page' : undefined} className={`pop-sm press flex min-h-11 flex-1 items-center justify-center gap-1 px-1 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${checkingFee ? 'bg-sunny' : 'bg-paper'}`}>
+            <ReceiptText aria-hidden size={16} strokeWidth={2.5} className="hidden shrink-0 min-[400px]:block" /> {t('menu.fare')}
+          </button>
+          <button type="button" onClick={openFreeze} aria-current={freezing ? 'page' : undefined} className={`pop-sm press flex min-h-11 flex-1 items-center justify-center gap-1 px-1 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${freezing ? 'bg-sunny' : 'bg-paper'}`}>
+            <Snowflake aria-hidden size={16} strokeWidth={2.5} className="hidden shrink-0 min-[400px]:block" /> {t('menu.freeze')}
+          </button>
+        </div>
+      </nav>
 
       {comparing && (
         <main>
@@ -144,8 +179,13 @@ export default function App() {
           <FeeCheck onClose={closeFeeCheck} />
         </main>
       )}
-      <main hidden={comparing || checkingFee}>
-        {view.name === 'idle' && <Landing onSearch={search} onFeeCheck={openFeeCheck} />}
+      {freezing && (
+        <main>
+          <FreezeCheck onClose={closeFreeze} />
+        </main>
+      )}
+      <main hidden={comparing || checkingFee || freezing}>
+        {view.name === 'idle' && <Landing onSearch={search} onFeeCheck={openFeeCheck} onFreeze={openFreeze} />}
         {view.name === 'loading' && <LoadingView query={view.query} />}
         {view.name === 'results' && (
           <>
@@ -189,7 +229,7 @@ export default function App() {
       <footer className="px-4 pb-8 text-center text-sm text-ink/60">
         {t('app.footer')}
       </footer>
-      {!comparing && !checkingFee && <CompareTray tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onClear={clearTray} onView={openCompare} />}
+      {!comparing && !checkingFee && !freezing && <CompareTray tray={tray} adding={adding} onAdd={addToCompare} onRemove={unpin} onClear={clearTray} onView={openCompare} />}
     </div>
   )
 }
@@ -207,7 +247,7 @@ function headlineWords(text) {
   return words
 }
 
-function Landing({ onSearch, onFeeCheck }) {
+function Landing({ onSearch, onFeeCheck, onFreeze }) {
   const t = useT()
   const root = useRef(null)
   // "I have a listing to check": the next address picked opens on the listing checker.
@@ -280,6 +320,20 @@ function Landing({ onSearch, onFeeCheck }) {
           <span className="min-w-0 flex-1">
             <span className="block font-display text-xl font-extrabold leading-tight">{t('fare.entry.title')}</span>
             <span className="mt-0.5 block text-sm text-ink/75">{t('fare.entry.body')}</span>
+          </span>
+          <ArrowRight aria-hidden size={22} strokeWidth={2.75} className="shrink-0 rtl:-scale-x-100" />
+        </button>
+        <button
+          type="button"
+          onClick={onFreeze}
+          className="fade-up pop press mt-3 flex w-full max-w-lg items-center gap-3 bg-mint p-4 text-start sm:p-5"
+        >
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-[2.5px] border-ink bg-paper">
+            <Snowflake aria-hidden size={24} strokeWidth={2.5} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-xl font-extrabold leading-tight">{t('freeze.entry.title')}</span>
+            <span className="mt-0.5 block text-sm text-ink/75">{t('freeze.entry.body')}</span>
           </span>
           <ArrowRight aria-hidden size={22} strokeWidth={2.75} className="shrink-0 rtl:-scale-x-100" />
         </button>

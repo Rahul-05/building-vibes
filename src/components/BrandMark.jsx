@@ -1,0 +1,18 @@
+// Brand mark: a bubbly little building with a snowflake badge, in the site's own
+// palette (bubblegum body, sunny roof, mint flake). Chunky and characterful, same
+// spirit as the mascot. Used in the masthead and as the favicon art.
+export default function BrandMark({ className = 'h-6 w-6' }) {
+  return (
+    <svg aria-hidden viewBox="0 0 64 64" className={`block shrink-0 ${className}`}>
+      <rect x="12" y="18" width="40" height="40" rx="12" fill="#ff5ca8" stroke="#1d1a3a" strokeWidth="3" />
+      <path d="M10 20 L32 6 L54 20 Z" fill="#ffd23f" stroke="#1d1a3a" strokeWidth="3" strokeLinejoin="round" />
+      <circle cx="25" cy="36" r="3.5" fill="#1d1a3a" />
+      <circle cx="39" cy="36" r="3.5" fill="#1d1a3a" />
+      <path d="M24 46 Q32 52 40 46" stroke="#1d1a3a" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <g transform="translate(46 44)">
+        <circle r="9" fill="#6ee7b7" stroke="#1d1a3a" strokeWidth="2.5" />
+        <path d="M-4.5 0 H4.5 M0 -4.5 V4.5 M-3.2 -3.2 L3.2 3.2 M3.2 -3.2 L-3.2 3.2" stroke="#1d1a3a" strokeWidth="1.8" strokeLinecap="round" />
+      </g>
+    </svg>
+  )
+}
