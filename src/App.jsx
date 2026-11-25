@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { ArrowLeft, ArrowRight, Building2, ClipboardList, ReceiptText, Snowflake, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, ReceiptText, Snowflake, Sparkles } from 'lucide-react'
 import Backdrop from './components/Backdrop.jsx'
 import BrandMark from './components/BrandMark.jsx'
 import Mascot from './components/Mascot.jsx'
@@ -132,6 +132,27 @@ export default function App() {
     setView({ name: 'idle' })
   }
 
+  // Hub menu as one segmented control: three tabs in a single capsule, the active one a
+  // sunny pill inside it. Arrow keys move between tabs (and switch to them); Home/End jump.
+  const tabs = [
+    { id: 'story', label: t('menu.story'), icon: Building2, active: !comparing && !checkingFee && !freezing, onSelect: reset, panel: 'panel-story' },
+    { id: 'fare', label: t('menu.fare'), icon: ReceiptText, active: checkingFee, onSelect: openFeeCheck, panel: 'panel-fare' },
+    { id: 'freeze', label: t('menu.freeze'), icon: Snowflake, active: freezing, onSelect: openFreeze, panel: 'panel-freeze' },
+  ]
+  const tabRefs = useRef([])
+  const onTabKeyDown = (e, i) => {
+    let next = null
+    if (e.key === 'ArrowRight') next = t.dir === 'rtl' ? i - 1 : i + 1
+    else if (e.key === 'ArrowLeft') next = t.dir === 'rtl' ? i + 1 : i - 1
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = tabs.length - 1
+    else return
+    e.preventDefault()
+    const j = (next + tabs.length) % tabs.length
+    tabRefs.current[j]?.focus()
+    tabs[j].onSelect()
+  }
+
   return (
     // Bottom padding clears the compare tray (it publishes its height) and the floating Ask button.
     // dir and lang follow the chosen language; RTL layouts lean on logical (start/end) classes.
@@ -153,19 +174,29 @@ export default function App() {
         </div>
       </header>
 
-      {/* Hub menu: the three tools, one stop. Three equal buttons that fit a 360px
-          phone (short labels, small text under sm), active tool in sunny. */}
+      {/* Hub menu: the three tools in one segmented capsule, active tool a sunny pill. */}
       <nav aria-label={t('menu.label')} className="mx-auto w-full max-w-5xl px-4 pb-2 sm:px-6">
-        <div className="flex gap-2">
-          <button type="button" onClick={reset} aria-current={!comparing && !checkingFee && !freezing ? 'page' : undefined} className={`pop-sm press flex min-h-11 flex-1 items-center justify-center gap-1 px-1 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${!comparing && !checkingFee && !freezing ? 'bg-sunny' : 'bg-paper'}`}>
-            <Building2 aria-hidden size={16} strokeWidth={2.5} className="hidden shrink-0 min-[400px]:block" /> {t('menu.story')}
-          </button>
-          <button type="button" onClick={openFeeCheck} aria-current={checkingFee ? 'page' : undefined} className={`pop-sm press flex min-h-11 flex-1 items-center justify-center gap-1 px-1 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${checkingFee ? 'bg-sunny' : 'bg-paper'}`}>
-            <ReceiptText aria-hidden size={16} strokeWidth={2.5} className="hidden shrink-0 min-[400px]:block" /> {t('menu.fare')}
-          </button>
-          <button type="button" onClick={openFreeze} aria-current={freezing ? 'page' : undefined} className={`pop-sm press flex min-h-11 flex-1 items-center justify-center gap-1 px-1 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${freezing ? 'bg-sunny' : 'bg-paper'}`}>
-            <Snowflake aria-hidden size={16} strokeWidth={2.5} className="hidden shrink-0 min-[400px]:block" /> {t('menu.freeze')}
-          </button>
+        <div role="tablist" aria-label={t('menu.label')} className="segmented">
+          {tabs.map((tab, i) => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                ref={(el) => { tabRefs.current[i] = el }}
+                id={`tab-${tab.id}`}
+                type="button"
+                role="tab"
+                aria-selected={tab.active}
+                aria-controls={tab.panel}
+                tabIndex={tab.active ? 0 : -1}
+                onClick={tab.onSelect}
+                onKeyDown={(e) => onTabKeyDown(e, i)}
+                className={`segment ${tab.active ? 'segment-active' : ''}`}
+              >
+                <Icon aria-hidden size={16} strokeWidth={2.5} className="hidden shrink-0 min-[400px]:block" /> {tab.label}
+              </button>
+            )
+          })}
         </div>
       </nav>
 
@@ -176,15 +207,20 @@ export default function App() {
       )}
       {checkingFee && (
         <main>
-          <FeeCheck onClose={closeFeeCheck} />
+          <div role="tabpanel" id="panel-fare" aria-labelledby="tab-fare" tabIndex={0}>
+            <FeeCheck onClose={closeFeeCheck} />
+          </div>
         </main>
       )}
       {freezing && (
         <main>
-          <FreezeCheck onClose={closeFreeze} />
+          <div role="tabpanel" id="panel-freeze" aria-labelledby="tab-freeze" tabIndex={0}>
+            <FreezeCheck onClose={closeFreeze} />
+          </div>
         </main>
       )}
       <main hidden={comparing || checkingFee || freezing}>
+        <div role="tabpanel" id="panel-story" aria-labelledby="tab-story" tabIndex={0}>
         {view.name === 'idle' && <Landing onSearch={search} onFeeCheck={openFeeCheck} onFreeze={openFreeze} />}
         {view.name === 'loading' && <LoadingView query={view.query} />}
         {view.name === 'results' && (
@@ -224,6 +260,7 @@ export default function App() {
             {t('app.errorBody')}
           </StateMessage>
         )}
+        </div>
       </main>
 
       <footer className="px-4 pb-8 text-center text-sm text-ink/60">
@@ -285,14 +322,18 @@ function Landing({ onSearch, onFeeCheck, onFreeze }) {
           <AddressSearch onSearch={go} autoFocus />
         </div>
         <div className="fade-up mt-3">
+          {/* On/off is a switch, not a button: a track with a knob that slides, sunny when on. */}
           <button
             type="button"
+            role="switch"
+            aria-checked={withListing}
             onClick={() => setWithListing((v) => !v)}
-            aria-pressed={withListing}
-            className={`pop-sm press inline-flex min-h-10 items-center gap-1.5 px-3 py-1.5 text-start text-sm font-bold ${withListing ? 'bg-lilac' : 'bg-paper'}`}
+            className="flex min-h-11 items-center gap-2.5 text-start"
           >
-            <ClipboardList aria-hidden size={16} strokeWidth={2.5} className="shrink-0" />
-            {withListing ? t('landing.listingOn') : t('landing.listingOff')}
+            <span aria-hidden className={`relative h-7 w-12 shrink-0 rounded-full border-2 border-ink transition-colors ${withListing ? 'bg-sunny' : 'bg-paper'}`}>
+              <span className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-ink bg-cream transition-all ${withListing ? 'start-[22px]' : 'start-[2px]'}`} />
+            </span>
+            <span className="text-sm font-bold">{t('landing.listingOff')}</span>
           </button>
           {withListing && (
             <p className="mt-2 max-w-lg text-sm text-ink/70">

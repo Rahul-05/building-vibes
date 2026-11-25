@@ -149,7 +149,7 @@ function Question({ step, answers, set, go, onSkip }) {
         <p className="mt-2 text-ink/75">{t(`freeze.q.${id}.help`)}</p>
         <div className="mt-5 grid gap-3">
           {CHOICES[id].map((c) => (
-            <label key={c} className={`pop-sm press flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 font-bold ${value === c ? 'bg-lilac' : 'bg-paper'}`}>
+            <label key={c} className={`pop-sm press flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 font-bold ${value === c ? 'bg-sunny' : 'bg-paper'}`}>
               <input type="radio" name={id} value={c} checked={value === c} onChange={() => set(id, c)} className="h-5 w-5 shrink-0 accent-bubblegum" />
               <span className="min-w-0">{t(`freeze.a.${id}.${c}`)}</span>
             </label>
@@ -233,13 +233,13 @@ function Outcome({ result, onRestart, onEdit }) {
             </span>
             <ExternalLink aria-hidden size={18} strokeWidth={2.5} className="ms-auto shrink-0" />
           </a>
-          <div className="pop-sm flex min-h-12 items-center gap-3 bg-sunny px-4 py-3 font-bold">
+          <a href="tel:311" className="pop-sm press flex min-h-12 items-center gap-3 bg-sunny px-4 py-3 font-bold">
             <Phone aria-hidden size={20} strokeWidth={2.5} className="shrink-0" />
             <span className="min-w-0">
               <span className="block">{t('freeze.next.hotline')}</span>
               <span className="block text-sm font-medium text-ink/70">{t('freeze.next.hotlineBody')}</span>
             </span>
-          </div>
+          </a>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           <button type="button" onClick={onEdit} className="pop-sm press min-h-12 bg-paper px-5 py-3 font-display font-bold">

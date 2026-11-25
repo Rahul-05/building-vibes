@@ -115,7 +115,7 @@ function Question({ step, answers, set, go }) {
           {CHOICES[id] && (
             <div className="mt-5 grid gap-3">
               {CHOICES[id].map((c) => (
-                <label key={c} className={`pop-sm press flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 font-bold ${value === c ? 'bg-lilac' : 'bg-paper'}`}>
+                <label key={c} className={`pop-sm press flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 font-bold ${value === c ? 'bg-sunny' : 'bg-paper'}`}>
                   <input type="radio" name={id} value={c} checked={value === c} onChange={() => set(id, c)} className="h-5 w-5 shrink-0 accent-bubblegum" />
                   <span className="min-w-0">{t(`fare.a.${id}.${c}`)}</span>
                 </label>

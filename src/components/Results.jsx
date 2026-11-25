@@ -101,7 +101,7 @@ export default function Results({ record, compare, startWith, onFeeCheck }) {
                   onClick={() => compare.onToggle(record)}
                   disabled={!compare.pinned && compare.full}
                   aria-pressed={compare.pinned}
-                  className="pop-sm press inline-flex min-h-10 items-center gap-1.5 bg-paper px-3 py-1.5 text-start text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`pop-sm press inline-flex min-h-10 items-center gap-1.5 px-3 py-1.5 text-start text-sm font-bold ${compare.pinned ? 'bg-sunny' : 'bg-paper'} disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   {compare.pinned ? <Check aria-hidden size={16} strokeWidth={3} className="shrink-0" /> : <GitCompareArrows aria-hidden size={16} strokeWidth={2.5} className="shrink-0" />}
                   {compare.pinned ? t('results.pinned') : compare.full ? t('results.trayFull', { max: 3 }) : t('results.compareThis')}

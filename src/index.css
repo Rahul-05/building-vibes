@@ -60,6 +60,25 @@
   .badge-row > :not(.pill) {
     @apply min-w-0;
   }
+  /* One capsule, one choice: the segmented control for mutually exclusive picks (the hub
+     menu). The active segment is a sunny pill inside the capsule; the inactive segments are
+     plain text on paper. Never three separate buttons for a tab-like choice. */
+  .segmented {
+    @apply flex rounded-full border-[2.5px] border-ink bg-paper p-1 shadow-pop-sm;
+  }
+  .segment {
+    @apply flex min-h-11 flex-1 items-center justify-center gap-1 rounded-full px-1 py-2 text-center text-xs font-bold leading-tight text-ink/70 transition-colors sm:text-sm;
+  }
+  .segment:hover {
+    @apply bg-ink/5 text-ink;
+  }
+  .segment-active {
+    @apply bg-sunny text-ink;
+    box-shadow: 2px 2px 0 0 var(--color-ink);
+  }
+  .segment-active:hover {
+    @apply bg-sunny;
+  }
   .pill {
     @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-full;
   }

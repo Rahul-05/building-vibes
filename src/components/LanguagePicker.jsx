@@ -65,7 +65,7 @@ export default function LanguagePicker() {
         type="button"
         onClick={() => choose(e.code)}
         aria-current={e.code === language ? 'true' : undefined}
-        className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-start hover:bg-lilac ${e.code === language ? 'bg-sunny/40' : ''}`}
+        className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-start hover:bg-lilac ${e.code === language ? 'bg-sunny' : ''}`}
       >
         <span className="min-w-0 flex-1">
           <span lang={e.code} dir="auto" className="block font-bold leading-tight">{e.native}</span>

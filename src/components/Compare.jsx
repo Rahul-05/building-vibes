@@ -280,7 +280,7 @@ export function CompareView({ tray, adding, onAdd, onRemove, onBack }) {
         <h1 className="flex items-center gap-2 text-3xl font-extrabold sm:text-4xl">
           <GitCompareArrows aria-hidden size={32} strokeWidth={2.75} /> {t('compare.heading')}
         </h1>
-        <button type="button" onClick={onBack} className="pop-sm press inline-flex min-h-10 items-center gap-1 bg-paper px-3 py-1.5 text-sm font-bold">
+        <button type="button" onClick={onBack} className="flex min-h-10 items-center gap-1 px-1 text-sm font-bold underline decoration-2 underline-offset-4">
           <ArrowLeft aria-hidden size={16} className="rtl:-scale-x-100" /> {t('compare.back')}
         </button>
       </div>
